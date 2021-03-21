@@ -2,6 +2,7 @@ package krb5
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -12,7 +13,6 @@ import (
 	"github.com/jcmturner/gokrb5/v8/config"
 	"github.com/jcmturner/gokrb5/v8/credentials"
 	"github.com/jcmturner/gokrb5/v8/crypto"
-	gokrbgss "github.com/jcmturner/gokrb5/v8/gssapi"
 	"github.com/jcmturner/gokrb5/v8/iana/chksumtype"
 	ianaflags "github.com/jcmturner/gokrb5/v8/iana/flags"
 	"github.com/jcmturner/gokrb5/v8/iana/keyusage"
@@ -39,7 +39,7 @@ type Krb5Mech struct {
 	sessionFlags        gssapi.ContextFlag
 	ourSequenceNumber   uint64
 	theirSequenceNumber uint64
-	theirSubKey         *types.EncryptionKey
+	acceptorSubKey      *types.EncryptionKey
 }
 
 func NewKrb5Mech() gssapi.Mech {
@@ -136,9 +136,9 @@ func (m *Krb5Mech) Continue(tokenIn []byte) (tokenOut []byte, err error) {
 		return
 	}
 
-	// stash their sequence number and subkey for use in GSS Wrap
+	// stash their sequence number and subkey for use in GSS Wrap/Unwrap
 	m.theirSequenceNumber = uint64(msg.SequenceNumber)
-	m.theirSubKey = &msg.Subkey
+	m.acceptorSubKey = &msg.Subkey
 
 	// check the response has the same time values as the request
 	// Note - we can't use time.Equal() as m.clientCTime has a monotomic clock value and
@@ -166,63 +166,36 @@ func (m *Krb5Mech) Wrap(tokenIn []byte, confidentiality bool) (tokenOut []byte, 
 
 func (m *Krb5Mech) Unwrap(tokenIn []byte) (tokenOut []byte, err error) {
 	// Unmarshall the token
-	wt := gokrbgss.WrapToken{}
-	if err = wt.Unmarshal(tokenIn, m.isInitiator); err != nil {
+	wt := WrapToken{}
+	if err = wt.Unmarshal(tokenIn); err != nil {
 		err = fmt.Errorf("gssapi: %s", err)
 		return
 	}
 
-	// Verify the token's integrity
-	// Checksum always uses the SEAL key usage
-	if _, err = wt.Verify(m.unwrapKey(&wt), keyusage.GSSAPI_ACCEPTOR_SEAL); err != nil {
+	key := m.sessionKey
+	if wt.Flags&GSSMessageTokenFlagAcceptorSubkey != 0 {
+		if m.acceptorSubKey == nil {
+			err = errors.New("gssapi: acceptor subkey not negotiated during token unwrap")
+			return
+		}
+
+		key = m.acceptorSubKey
+	}
+
+	// Verify the token's integrity and get the unsealed / unsigned payload
+	if err = wt.VerifyAndDecode(*key, m.isInitiator); err != nil {
 		err = fmt.Errorf("gssapi: %s", err)
 		return
 	}
 
 	// Check the sequence number
-	if wt.SndSeqNum != m.theirSequenceNumber {
-		err = fmt.Errorf("gssapi: bad sequence number from peer, got %d, wanted %d", wt.SndSeqNum, m.theirSequenceNumber)
+	if wt.SequenceNumber != m.theirSequenceNumber {
+		err = fmt.Errorf("gssapi: bad sequence number from peer, got %d, wanted %d", wt.SequenceNumber, m.theirSequenceNumber)
 		return
 	}
 	m.theirSequenceNumber++
 
-	if wt.Flags&2 == 2 {
-		// Decrypt the message
-		tokenOut, err = crypto.DecryptMessage(wt.Payload, m.unwrapKey(&wt), m.unwrapKeyUsage(&wt))
-		if err != nil {
-			err = fmt.Errorf("gssapi: %s", err)
-			return
-		}
-	} else {
-		tokenOut = wt.Payload
-	}
-
 	return
-}
-
-// return the sub-key from the AP-REP if the AcceptorSubkey flag is set
-func (m *Krb5Mech) unwrapKey(wt *gokrbgss.WrapToken) types.EncryptionKey {
-	if wt.Flags&4 == 4 {
-		return *m.theirSubKey
-	} else {
-		return *m.sessionKey
-	}
-}
-
-func (m *Krb5Mech) unwrapKeyUsage(wt *gokrbgss.WrapToken) uint32 {
-	isSealed := wt.Flags&2 == 2
-	switch {
-	case m.isInitiator && isSealed:
-		return keyusage.GSSAPI_ACCEPTOR_SEAL
-	case m.isInitiator && !isSealed:
-		return keyusage.GSSAPI_ACCEPTOR_SIGN
-	case !m.isInitiator && isSealed:
-		return keyusage.GSSAPI_INITIATOR_SEAL
-	case !(m.isInitiator || isSealed):
-		return keyusage.GSSAPI_INITIATOR_SIGN
-	}
-
-	return 0
 }
 
 func (m *Krb5Mech) getAPReqMessage() (apreq messages.APReq, err error) {
@@ -309,39 +282,39 @@ func krbCCFile() string {
 	return strings.TrimPrefix(ccFile, "FILE:")
 }
 
-func (m *Krb5Mech) newWrapToken(payload []byte, sealed bool) (tokenOut gokrbgss.WrapToken, err error) {
-	// using the session key for now until we implement subkeys
-	encType, err := crypto.GetEtype(m.sessionKey.KeyType)
-	if err != nil {
-		err = fmt.Errorf("gssapi: %s", err)
-	}
+func (m *Krb5Mech) newWrapToken(payload []byte, sealed bool) (token WrapToken, err error) {
+	var flags GSSMessageTokenFlag
 
-	var flags byte
+	if !m.isInitiator {
+		flags |= GSSMessageTokenFlagSentByAcceptor // send by acceptor
+	}
 	if sealed {
-		flags |= 2 // sealed
-	}
-	if !m.isInitiator {
-		flags |= 1 // send by acceptor
+		flags |= GSSMessageTokenFlagSealed // sealed
 	}
 
-	tokenOut = gokrbgss.WrapToken{
-		Flags: flags,
-		// Checksum size: length of output of the HMAC function, in bytes.
-		EC:        uint16(encType.GetHMACBitLength() / 8),
-		RRC:       0,
-		SndSeqNum: m.ourSequenceNumber,
-		Payload:   payload,
+	// use the acceptor subkey if it was negotiated during auth
+	key := m.sessionKey
+	if m.acceptorSubKey != nil {
+		key = m.acceptorSubKey
+		flags |= GSSMessageTokenFlagAcceptorSubkey
 	}
 
-	usage := keyusage.GSSAPI_INITIATOR_SEAL
-	if !m.isInitiator {
-		usage = keyusage.GSSAPI_ACCEPTOR_SEAL
-	}
-	if err = tokenOut.SetCheckSum(*m.sessionKey, uint32(usage)); err != nil {
-		err = fmt.Errorf("gssapi: ", err)
-		return
+	token = WrapToken{
+		Flags:          flags,
+		SequenceNumber: m.ourSequenceNumber,
+		Payload:        payload,
 	}
 
-	m.ourSequenceNumber++ // only bump the sequence number if everything is good
+	// encrypt or sign the payload, see RFC 4121 § 4.2.4
+	if sealed {
+		err = token.Seal(*key)
+	} else {
+		err = token.Sign(*key)
+	}
+
+	if err == nil {
+		m.ourSequenceNumber++ // only bump the sequence number if everything is good
+	}
+
 	return
 }

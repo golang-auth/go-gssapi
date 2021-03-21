@@ -4,6 +4,12 @@
 *.dll
 *.so
 *.dylib
+*.o
+
+examples/c/gss-client-c
+examples/c/gss-server-c
+examples/go/gss-client-go
+examples/go/gss-server-go
 
 # Test binary, built with `go test -c`
 *.test
@@ -13,3 +19,4 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+#

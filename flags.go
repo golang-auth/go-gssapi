@@ -11,3 +11,35 @@ const (
 	ContextFlagConf                             // confidentiality available
 	ContextFlagInteg                            // integrity available
 )
+
+func FlagList(f ContextFlag) (fl []ContextFlag) {
+	t := ContextFlag(1)
+	for i := 0; i < 32; i++ {
+		if f&t != 0 {
+			fl = append(fl, t)
+		}
+
+		t = t << 1
+	}
+
+	return
+}
+
+func FlagName(f ContextFlag) string {
+	switch f {
+	case ContextFlagDeleg:
+		return "Delegation"
+	case ContextFlagMutual:
+		return "Mutual authentication"
+	case ContextFlagReplay:
+		return "Message replay detection"
+	case ContextFlagSequence:
+		return "Out of sequence message detection"
+	case ContextFlagConf:
+		return "Confidentiality"
+	case ContextFlagInteg:
+		return "Integrity"
+	}
+
+	return "Unknown"
+}

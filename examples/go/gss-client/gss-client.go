@@ -22,7 +22,7 @@ func main() {
 	flag.Parse()
 
 	if flag.NArg() != 3 {
-		fmt.Fprintf(os.Stderr, "Usage: %s [-port <int>] [-mutual] [-seal] host service msg\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s [-port <int>] [-mutual] [-seal] [-d] host service msg\n", os.Args[0])
 		os.Exit(1)
 	}
 
@@ -46,26 +46,32 @@ func main() {
 	if *mutual {
 		flags |= gssapi.ContextFlagMutual
 	}
-	outToken, err := client.Initiate(service, flags)
+	if err := client.Initiate(service, flags); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 
-	for {
-		if len(outToken) > 0 {
-			if sendErr := sendToken(conn, outToken); sendErr != nil {
-				err = sendErr
-			}
-		}
+	var inToken, outToken []byte
 
-		if err != gssapi.ContinueNeeded {
-			break
-		}
-
-		var inToken []byte
-		inToken, err = recvToken(conn)
+	for !client.IsEstablished() {
+		outToken, err = client.Continue(inToken)
 		if err != nil {
 			break
 		}
 
-		outToken, err = client.Continue(inToken)
+		if len(outToken) > 0 {
+			if sendErr := sendToken(conn, outToken); sendErr != nil {
+				err = sendErr
+				break
+			}
+		}
+
+		if !client.IsEstablished() {
+			inToken, err = recvToken(conn)
+			if err != nil {
+				break
+			}
+		}
 	}
 
 	if err != nil {
@@ -73,9 +79,22 @@ func main() {
 		os.Exit(1)
 	}
 
+	debug("Context established, sever: %s", client.PeerName())
+	gotFlags := gssapi.FlagList(client.ContextFlags())
+	for _, f := range gotFlags {
+		debug("  context flag: 0x%02x: %s", f, gssapi.FlagName(f))
+	}
+
 	// Wrap the message
 	outToken, err = client.Wrap([]byte(msg), *seal)
-	sendToken(conn, outToken)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if err = sendToken(conn, outToken); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 }
 
 func sendToken(conn net.Conn, token []byte) error {

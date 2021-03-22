@@ -7,7 +7,7 @@ OBJS = $(SRC:.c=.o)
 all: $(BINS)
 
 gss-server-c: gss-server.o gss-misc.o
-	$(CC) -o $@ $^ -lgssapi_krb5
+	$(CC) -g -o $@ $^ -lgssapi_krb5
 
 gss-client-c: gss-client.o gss-misc.o
-	$(CC) -o $@ $^ -lgssapi_krb5
+	$(CC) -g -o $@ $^ -lgssapi_krb5

@@ -34,6 +34,7 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <stdbool.h>
 
 #include <gssapi/gssapi.h>
 #include <gssapi/gssapi_ext.h>
@@ -41,7 +42,7 @@
 
 void usage()
 {
-     fprintf(stderr, "Usage: gss-client [-port port] [-d] host service \
+     fprintf(stderr, "Usage: gss-client [-port port] [-d] [-seal] [-mutual] host service \
 msg\n");
      exit(1);
 }
@@ -120,12 +121,12 @@ int connect_to_server(host, port)
  * unsuccessful, the GSS-API error messages are displayed on stderr
  * and -1 is returned.
  */
-int client_establish_context(s, service_name, deleg_flag, oid,
+int client_establish_context(s, service_name, req_flags,  oid,
                              gss_context, ret_flags)
      int s;
      char *service_name;
      gss_OID oid;
-     OM_uint32 deleg_flag;
+     OM_uint32 req_flags;
      gss_ctx_id_t *gss_context;
      OM_uint32 *ret_flags;
 {
@@ -162,6 +163,8 @@ int client_establish_context(s, service_name, deleg_flag, oid,
       * and only if the server has another token to send us.
       */
      
+     fprintf(stderr, "req_flags: %d\n", req_flags);
+     fprintf(stderr, "service_name: %s\n", service_name);
      token_ptr = GSS_C_NO_BUFFER;
      *gss_context = GSS_C_NO_CONTEXT;
 
@@ -172,8 +175,7 @@ int client_establish_context(s, service_name, deleg_flag, oid,
                                     gss_context,
                                     target_name,
                                     oid,
-                                    GSS_C_MUTUAL_FLAG | GSS_C_REPLAY_FLAG |
-                                                        deleg_flag,
+                                    req_flags | GSS_C_REPLAY_FLAG,
                                     0,
                                     NULL,       /* no channel bindings */
                                     token_ptr,
@@ -286,14 +288,15 @@ void read_file(file_name, in_buf)
  * reads back a GSS-API signature block for msg from the server, and
  * verifies it with gss_verify.  -1 is returned if any step fails,
  * otherwise 0 is returned.  */
-int call_server(host, port, oid, service_name, deleg_flag, msg, use_file)
+int call_server(host, port, oid, service_name, req_flag, msg, use_file, seal)
      char *host;
      u_short port;
      gss_OID oid;
      char *service_name;
-     OM_uint32 deleg_flag;
+     OM_uint32 req_flag;
      char *msg;
      int use_file;
+     bool seal;
 {
      gss_ctx_id_t context;
      gss_buffer_desc in_buf, out_buf;
@@ -317,7 +320,7 @@ int call_server(host, port, oid, service_name, deleg_flag, msg, use_file)
           return -1;
 
      /* Establish context */
-     if (client_establish_context(s, service_name, deleg_flag, oid,
+     if (client_establish_context(s, service_name, req_flag,  oid,
          &context, &ret_flags) < 0) {
          (void) close(s);
          return -1;
@@ -416,7 +419,7 @@ int call_server(host, port, oid, service_name, deleg_flag, msg, use_file)
          in_buf.length = strlen(msg);
      }
 
-     maj_stat = gss_wrap(&min_stat, context, 1, GSS_C_QOP_DEFAULT,
+     maj_stat = gss_wrap(&min_stat, context, seal ? 1 : 0, GSS_C_QOP_DEFAULT,
                          &in_buf, &state, &out_buf);
      if (maj_stat != GSS_S_COMPLETE) {
           display_status("sealing message", maj_stat, min_stat);
@@ -510,7 +513,8 @@ int main(argc, argv)
      char *mechanism = 0;
      u_short port = 4444;
      int use_file = 0;
-     OM_uint32 deleg_flag = 0, min_stat;
+     bool seal = false;
+     OM_uint32 req_flags = 0, min_stat;
      gss_OID oid = GSS_C_NULL_OID;
      
      display_file = stdout;
@@ -527,9 +531,13 @@ int main(argc, argv)
                if (!argc) usage();
                mechanism = *argv;
           } else if (strcmp(*argv, "-d") == 0) {
-               deleg_flag = GSS_C_DELEG_FLAG;
+               req_flags |= GSS_C_DELEG_FLAG;
           } else if (strcmp(*argv, "-f") == 0) {
                use_file = 1;
+          } else if (strcmp(*argv, "-seal") == 0) {
+               seal = true;
+          } else if (strcmp(*argv, "-mutual") == 0) {
+               req_flags |= GSS_C_MUTUAL_FLAG;
           } else 
                break;
           argc--; argv++;
@@ -545,7 +553,7 @@ int main(argc, argv)
          parse_oid(mechanism, &oid);
 
      if (call_server(server_host, port, oid, service_name,
-                     deleg_flag, msg, use_file) < 0)
+                     req_flags, msg, use_file, seal) < 0)
           exit(1);
 
      if (oid != GSS_C_NULL_OID)

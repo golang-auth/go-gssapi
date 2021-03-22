@@ -152,6 +152,7 @@ func (wt *WrapToken) header() (hdr []byte) {
 }
 
 func (wt *WrapToken) computeChecksum(key types.EncryptionKey) (cksum []byte, err error) {
+	// wrap tokens always use the Seal key usage (where is this documented other than the MIT Kerberos source code?)
 	usage := keyusage.GSSAPI_INITIATOR_SEAL
 	if wt.Flags&GSSMessageTokenFlagSentByAcceptor != 0 {
 		usage = keyusage.GSSAPI_ACCEPTOR_SEAL
@@ -203,7 +204,7 @@ func (wt *WrapToken) Marshal() (token []byte, err error) {
 // Unmarshal a signed or sealed token
 func (wt *WrapToken) Unmarshal(token []byte) (err error) {
 	// zero everything in the token
-	wt = &WrapToken{}
+	*wt = WrapToken{}
 
 	// token must be at least 16 bytes
 	if len(token) < msgTokenHdrLen {
@@ -234,23 +235,23 @@ func (wt *WrapToken) Unmarshal(token []byte) (err error) {
 	return nil
 }
 
-func (wt *WrapToken) VerifyAndDecode(key types.EncryptionKey, expectFromAcceptor bool) (err error) {
+func (wt *WrapToken) VerifyAndDecode(key types.EncryptionKey, expectFromAcceptor bool) (isSealed bool, err error) {
 	if !wt.signedOrSealed {
-		return errors.New("gssapi: wrap token is not signed or sealed")
+		return false, errors.New("gssapi: wrap token is not signed or sealed")
 	}
 	if wt.Payload == nil || len(wt.Payload) == 0 {
-		return errors.New("gssapi: cannot verify an empty wrap token payload")
+		return false, errors.New("gssapi: cannot verify an empty wrap token payload")
 	}
 
 	isFromAcceptor := wt.Flags&GSSMessageTokenFlagSentByAcceptor != 0
 	if isFromAcceptor != expectFromAcceptor {
-		return fmt.Errorf("gssapi: wrap token from acceptor: %t, expect from acceptor: %t", isFromAcceptor, expectFromAcceptor)
+		return false, fmt.Errorf("gssapi: wrap token from acceptor: %t, expect from acceptor: %t", isFromAcceptor, expectFromAcceptor)
 	}
 
 	if wt.Flags&GSSMessageTokenFlagSealed != 0 {
-		return wt.decrypt(key)
+		return true, wt.decrypt(key)
 	} else {
-		return wt.checkSig(key)
+		return false, wt.checkSig(key)
 	}
 
 	return
@@ -270,7 +271,7 @@ func (wt *WrapToken) decrypt(key types.EncryptionKey) (err error) {
 	var decrypted []byte
 	decrypted, err = encType.DecryptMessage(key.KeyValue, wt.Payload, uint32(usage))
 	if err != nil {
-		err = fmt.Errorf("gssapi: wrap token: %s", err)
+		return fmt.Errorf("gssapi: wrap token: %s", err)
 	}
 
 	// check that the decrypted payload is big enough
@@ -286,7 +287,7 @@ func (wt *WrapToken) decrypt(key types.EncryptionKey) (err error) {
 	if err = wt2.Unmarshal(decryptedHeader); err != nil {
 		return
 	}
-	if !(wt.Flags != wt2.Flags &&
+	if !(wt.Flags == wt2.Flags &&
 		wt.EC == wt2.EC &&
 		wt.SequenceNumber == wt2.SequenceNumber) {
 		return errors.New("gssapi: wrap token header was modified")
@@ -316,7 +317,10 @@ func (wt *WrapToken) checkSig(key types.EncryptionKey) (err error) {
 	}
 
 	tokCksum := wt.Payload[len(wt.Payload)-int(wt.EC):]
-	computedCksum, err := wt.computeChecksum(key)
+
+	wt2 := *wt
+	wt2.Payload = wt.Payload[0 : len(wt.Payload)-int(wt.EC)]
+	computedCksum, err := wt2.computeChecksum(key)
 	if err != nil {
 		return fmt.Errorf("gssapi: %s", err)
 	}

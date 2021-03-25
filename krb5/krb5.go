@@ -28,6 +28,7 @@ import (
 
 func init() {
 	gssapi.Register("kerberos_v5", NewKrb5Mech)
+	gssapi.Register("1.2.840.113554.1.2.2}", NewKrb5Mech)
 }
 
 var clockSkew = time.Second * 10
@@ -106,6 +107,9 @@ func (m *Krb5Mech) Initiate(serviceName string, requestFlags gssapi.ContextFlag)
 	m.sessionFlags = gssapi.ContextFlagConf | gssapi.ContextFlagInteg |
 		gssapi.ContextFlagReplay | gssapi.ContextFlagSequence
 
+	// requuest flags is the subset that we support of the requested flags, used in the context
+	// negotiation.  The set we will tell the caller that we actually support is the above,
+	// sessionFlags which may include more than the requested set
 	m.requestFlags = requestFlags & (gssapi.ContextFlagConf | gssapi.ContextFlagInteg |
 		gssapi.ContextFlagMutual | gssapi.ContextFlagReplay | gssapi.ContextFlagSequence)
 
@@ -141,9 +145,9 @@ func (m *Krb5Mech) continueInitiator(tokenIn []byte) (tokenOut []byte, err error
 		// Create the GSSAPI token
 		tb, _ := hex.DecodeString(TOK_ID_KRB_AP_REQ)
 		gssToken := kRB5Token{
-			OID:   OID(),
+			oID:   OID(),
 			tokID: tb,
-			APReq: &apreq,
+			aPReq: &apreq,
 		}
 
 		tokenOut, err = gssToken.marshal()
@@ -174,18 +178,18 @@ func (m *Krb5Mech) continueInitiator(tokenIn []byte) (tokenOut []byte, err error
 		return
 	}
 
-	if gssToken.KRBError != nil {
-		err = fmt.Errorf("gssapi: %s", gssToken.KRBError.Error())
+	if gssToken.kRBError != nil {
+		err = fmt.Errorf("gssapi: %s", gssToken.kRBError.Error())
 		return
 	}
 
-	if gssToken.APRep == nil {
+	if gssToken.aPRep == nil {
 		err = errors.New("gssapi: GSSAPI token does not contain AP-REP message")
 		return
 	}
 
 	// decrypt/verify the private part of the AP-REP message
-	msg, err := gssToken.APRep.decryptEncPart(*m.sessionKey)
+	msg, err := gssToken.aPRep.decryptEncPart(*m.sessionKey)
 	if err != nil {
 		err = fmt.Errorf("gssapi: %s", err)
 		return
@@ -221,58 +225,58 @@ func (m *Krb5Mech) continueAcceptor(tokenIn []byte) (tokenOut []byte, err error)
 		return
 	}
 
-	if gssInToken.KRBError != nil {
-		err = fmt.Errorf("gssapi: %s", gssInToken.KRBError.Error())
+	if gssInToken.kRBError != nil {
+		err = fmt.Errorf("gssapi: %s", gssInToken.kRBError.Error())
 		return
 	}
 
 	// RFC says: must return a KRBError message to the client if the token ID was invalid
 	// Note sure other implementatios really do this
-	if gssInToken.KRBError == nil && gssInToken.APReq == nil && gssInToken.APRep == nil {
+	if gssInToken.kRBError == nil && gssInToken.aPReq == nil && gssInToken.aPRep == nil {
 		tokenOut, err = mkGssErrKrbCode(ianaerrcode.KRB_AP_ERR_MSG_TYPE, "gss accept failed")
 		return
 	}
 
 	// avoid crash if GSSAPI token isn't an initial token
-	if gssInToken.APReq == nil {
+	if gssInToken.aPReq == nil {
 		err = errors.New("gssapi: GSSAPI token does not contain AP-REQ message")
 		return
 	}
 
 	ktFile := krbKtFile()
 
-	err, krbErr := verifyAPReq(ktFile, gssInToken.APReq, clockSkew)
+	err, krbErr := verifyAPReq(ktFile, gssInToken.aPReq, clockSkew)
 	if err != nil {
 		tokenOut, err = mkGssErrFromKrbErr(krbErr.(messages.KRBError))
 		return
 	}
 
 	// stash the sequence number for use in GSS Wrap
-	m.theirSequenceNumber = uint64(gssInToken.APReq.Authenticator.SeqNumber)
+	m.theirSequenceNumber = uint64(gssInToken.aPReq.Authenticator.SeqNumber)
 
 	// stash the APReq time flags for use in mutual authentication
-	m.clientCTime = gssInToken.APReq.Authenticator.CTime
-	m.clientCusec = gssInToken.APReq.Authenticator.Cusec
+	m.clientCTime = gssInToken.aPReq.Authenticator.CTime
+	m.clientCusec = gssInToken.aPReq.Authenticator.Cusec
 
 	// stash the session key and ticket
-	m.ticket = &gssInToken.APReq.Ticket
-	m.sessionKey = &gssInToken.APReq.Ticket.DecryptedEncPart.Key
+	m.ticket = &gssInToken.aPReq.Ticket
+	m.sessionKey = &gssInToken.aPReq.Ticket.DecryptedEncPart.Key
 
 	// stash the initiator subkey if there is one
-	if gssInToken.APReq.Authenticator.SubKey.KeyType != 0 {
-		m.initiatorSubKey = &gssInToken.APReq.Authenticator.SubKey
+	if gssInToken.aPReq.Authenticator.SubKey.KeyType != 0 {
+		m.initiatorSubKey = &gssInToken.aPReq.Authenticator.SubKey
 	}
 
 	// stash the client's principal name
 	m.peerName = fmt.Sprintf("%s@%s",
-		gssInToken.APReq.Ticket.DecryptedEncPart.CName.PrincipalNameString(),
-		gssInToken.APReq.Ticket.DecryptedEncPart.CRealm)
+		gssInToken.aPReq.Ticket.DecryptedEncPart.CName.PrincipalNameString(),
+		gssInToken.aPReq.Ticket.DecryptedEncPart.CRealm)
 
 	// if the client requested mutual authentication, send them an AP-REP message
-	if types.IsFlagSet(&gssInToken.APReq.APOptions, ianaflags.APOptionMutualRequired) {
+	if types.IsFlagSet(&gssInToken.aPReq.APOptions, ianaflags.APOptionMutualRequired) {
 		tb, _ := hex.DecodeString(TOK_ID_KRB_AP_REP)
 		gssOutToken := kRB5Token{
-			OID:   OID(),
+			oID:   OID(),
 			tokID: tb,
 		}
 
@@ -281,7 +285,7 @@ func (m *Krb5Mech) continueAcceptor(tokenIn []byte) (tokenOut []byte, err error)
 		if err != nil {
 			return
 		}
-		gssOutToken.APRep = &aprep
+		gssOutToken.aPRep = &aprep
 
 		tokenOut, err = gssOutToken.marshal()
 		if err != nil {
@@ -580,9 +584,9 @@ func mkGssErrKrbCode(code int32, message string) (token []byte, err error) {
 func mkGssErrFromKrbErr(ke messages.KRBError) (token []byte, err error) {
 	tb, _ := hex.DecodeString(TOK_ID_KRB_ERROR)
 	gssToken := kRB5Token{
-		OID:      OID(),
+		oID:      OID(),
 		tokID:    tb,
-		KRBError: &ke,
+		kRBError: &ke,
 	}
 
 	token, err = gssToken.marshal()

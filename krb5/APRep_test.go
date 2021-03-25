@@ -12,43 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Sample data from MIT Kerberos v1.19.1
-
-// from src/tests/asn.1/ktest.h
-const (
-	SAMPLE_USEC       = 123456
-	SAMPLE_SEQ_NUMBER = 17
-	SAMPLE_NONCE      = 42
-	SAMPLE_FLAGS      = 0xFEDCBA98
-	SAMPLE_ERROR      = 0x3C
-)
-
-func ktest_make_sample_ap_rep_enc_part() *encAPRepPart {
-	tm, _ := time.Parse(testdata.TEST_TIME_FORMAT, testdata.TEST_TIME)
-	return &encAPRepPart{
-		CTime:          tm,
-		Cusec:          SAMPLE_USEC,
-		Subkey:         *ktest_make_sample_keyblock(),
-		SequenceNumber: SAMPLE_SEQ_NUMBER,
-	}
-}
-
-func ktest_make_sample_keyblock() *types.EncryptionKey {
-	kv := []byte("12345678")
-	return &types.EncryptionKey{
-		KeyType:  1,
-		KeyValue: kv,
-	}
-}
-
-func ktest_make_sample_enc_data() *types.EncryptedData {
-	return &types.EncryptedData{
-		EType:  0,
-		KVNO:   5,
-		Cipher: []byte("krbASN.1 test message"),
-	}
-}
-
 func TestUnmarshalAPRep(t *testing.T) {
 	t.Parallel()
 	var a aPRep
@@ -142,11 +105,7 @@ func TestAprepMarshal(t *testing.T) {
 	want, err := hex.DecodeString(testdata.MarshaledKRB5ap_rep)
 	assert.Nil(t, err, "error not expected decoding test data")
 
-	aprep := aPRep{
-		PVNO:    iana.PVNO,
-		MsgType: msgtype.KRB_AP_REP,
-		EncPart: *ktest_make_sample_enc_data(),
-	}
+	aprep := ktest_make_sample_ap_rep()
 
 	b, err := aprep.marshal()
 	assert.Nil(t, err, "enc part marshal error not expected")

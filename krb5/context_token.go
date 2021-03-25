@@ -29,32 +29,32 @@ const (
 
 // kRB5Token context token implementation for GSSAPI.
 type kRB5Token struct {
-	OID      asn1.ObjectIdentifier
+	oID      asn1.ObjectIdentifier
 	tokID    []byte
-	APReq    *messages.APReq
-	APRep    *aPRep
-	KRBError *messages.KRBError
+	aPReq    *messages.APReq
+	aPRep    *aPRep
+	kRBError *messages.KRBError
 }
 
 // marshal a KRB5Token into a slice of bytes.
 func (m *kRB5Token) marshal() (outTok []byte, err error) {
 	// Create the header
-	b, _ := asn1.Marshal(m.OID)
+	b, _ := asn1.Marshal(m.oID)
 	b = append(b, m.tokID...)
 	var tb []byte
 	switch hex.EncodeToString(m.tokID) {
 	case TOK_ID_KRB_AP_REQ:
-		tb, err = m.APReq.Marshal()
+		tb, err = m.aPReq.Marshal()
 		if err != nil {
 			err = fmt.Errorf("gssapi: error marshalling AP-REQ for MechToken: %v", err)
 		}
 	case TOK_ID_KRB_AP_REP:
-		tb, err = m.APRep.marshal()
+		tb, err = m.aPRep.marshal()
 		if err != nil {
 			err = fmt.Errorf("gssapi: error marshalling AP-REP for MechToken: %v", err)
 		}
 	case TOK_ID_KRB_ERROR:
-		tb, err = m.KRBError.Marshal()
+		tb, err = m.kRBError.Marshal()
 		if err != nil {
 			err = fmt.Errorf("gssapi: error marshalling KRB-ERROR for MechToken: %v", err)
 		}
@@ -70,9 +70,9 @@ func (m *kRB5Token) marshal() (outTok []byte, err error) {
 
 // unmarshal a KRB5Token.
 func (m *kRB5Token) unmarshal(b []byte) error {
-	m.APReq = nil
-	m.APRep = nil
-	m.KRBError = nil
+	m.aPReq = nil
+	m.aPRep = nil
+	m.kRBError = nil
 
 	var oid asn1.ObjectIdentifier
 	r, err := asn1.UnmarshalWithParams(b, &oid, fmt.Sprintf("application,explicit,tag:%v", 0))
@@ -82,7 +82,7 @@ func (m *kRB5Token) unmarshal(b []byte) error {
 	if !oid.Equal(OID()) {
 		return fmt.Errorf("gssapi: error unmarshalling KRB5Token, OID is %s not %s", oid.String(), OID().String())
 	}
-	m.OID = oid
+	m.oID = oid
 	if len(r) < 2 {
 		return fmt.Errorf("gssapi: krb5token too short")
 	}
@@ -94,21 +94,21 @@ func (m *kRB5Token) unmarshal(b []byte) error {
 		if err != nil {
 			return fmt.Errorf("gssapi: error unmarshalling KRB5Token AP_REQ: %v", err)
 		}
-		m.APReq = &a
+		m.aPReq = &a
 	case TOK_ID_KRB_AP_REP:
 		var a aPRep
 		err = a.unmarshal(r[2:])
 		if err != nil {
 			return fmt.Errorf("gssapi: error unmarshalling KRB5Token AP_REP: %v", err)
 		}
-		m.APRep = &a
+		m.aPRep = &a
 	case TOK_ID_KRB_ERROR:
 		var a messages.KRBError
 		err = a.Unmarshal(r[2:])
 		if err != nil {
 			return fmt.Errorf("gssapi: error unmarshalling KRB5Token KRBError: %v", err)
 		}
-		m.KRBError = &a
+		m.kRBError = &a
 	}
 	return nil
 }

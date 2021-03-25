@@ -211,6 +211,14 @@ func (wt *WrapToken) Unmarshal(token []byte) (err error) {
 		return errors.New("gssapi: wrap token is too short")
 	}
 
+	// Check for 0x60 as the first byte;  As per RFC 4121 § 4.4, these Token IDs
+	// are reserved - and indicate 'Generic GSS-API token framing' that was used by
+	// GSS-API v1, and are not supported in GSS-API v2.. catch that specific case so
+	// we can emmit a useful message
+	if token[0] == 0x60 {
+		return errors.New("gssapi: GSS-API v1 message tokens are not supported")
+	}
+
 	// check token ID
 	tokenID := getGssWrapTokenId()
 	if !bytes.Equal(tokenID[:], token[0:2]) {

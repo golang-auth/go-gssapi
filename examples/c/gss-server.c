@@ -273,12 +273,8 @@ static float timeval_subtract(tv1, tv2)
                 ((float) (tv1->tv_usec - tv2->tv_usec)) / 1000000);
 }
 
-/*
- * Yes, yes, this isn't the best place for doing this test.
- * DO NOT REMOVE THIS UNTIL A BETTER TEST HAS BEEN WRITTEN, THOUGH.
- *                                      -TYT
- */
-int test_import_export_context(context)
+
+int export_context(context)
         gss_ctx_id_t *context;
 {
         OM_uint32       min_stat, maj_stat;
@@ -299,6 +295,10 @@ int test_import_export_context(context)
         if (verbose && logger)
                 fprintf(logger, "Exported context: %d bytes, %7.4f seconds\n",
                         context_token.length, timeval_subtract(&tm2, &tm1));
+
+        fprintf(logger, "Exported context bytes:\n");
+        print_token(&context_token);
+
         copied_token.length = context_token.length;
         copied_token.value = malloc(context_token.length);
         if (copied_token.value == 0) {
@@ -322,6 +322,7 @@ int test_import_export_context(context)
         (void) gss_release_buffer(&min_stat, &context_token);
         return 0;
 }
+
 
 /*
  * Function: sign_server
@@ -348,9 +349,10 @@ int test_import_export_context(context)
  *
  * If any error occurs, -1 is returned.
  */
-int sign_server(s, server_creds)
+int sign_server(s, server_creds, export_ctx)
      int s;
      gss_cred_id_t server_creds;
+     int export_ctx;
 {
      gss_buffer_desc client_name, xmit_buf, msg_buf;
      gss_ctx_id_t context;
@@ -367,9 +369,10 @@ int sign_server(s, server_creds)
             (int) client_name.length, (char *) client_name.value);
      (void) gss_release_buffer(&min_stat, &client_name);
 
-     for (i=0; i < 3; i++)
-             if (test_import_export_context(&context))
-                     return -1;
+    if( export_ctx )
+        if (export_context(&context))
+            return -1;
+
 
      /* Receive the sealed message token */
      if (recv_token(s, &xmit_buf) < 0)
@@ -429,6 +432,8 @@ int sign_server(s, server_creds)
      return(0);
 }
 
+
+
 int
 main(argc, argv)
      int argc;
@@ -441,6 +446,7 @@ main(argc, argv)
      int s;
      int once = 0;
      int do_inetd = 0;
+     int export_ctx = 0;
 
      logger = stdout;
      display_file = stdout;
@@ -456,6 +462,8 @@ main(argc, argv)
               once = 1;
           } else if (strcmp(*argv, "-inetd") == 0) {
               do_inetd = 1;
+          } else if (strcmp(*argv, "-export") == 0) {
+              export_ctx = 1;
           } else if (strcmp(*argv, "-logfile") == 0) {
               argc--; argv++;
               if (!argc) usage();
@@ -498,7 +506,7 @@ main(argc, argv)
                  }
                  /* this return value is not checked, because there's
                     not really anything to do if it fails */
-                 sign_server(s, server_creds);
+                 sign_server(s, server_creds, export_ctx);
                  close(s);
              } while (!once);
 

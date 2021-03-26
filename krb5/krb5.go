@@ -2,6 +2,7 @@ package krb5
 
 import (
 	"crypto/rand"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -20,6 +21,7 @@ import (
 	ianaerrcode "github.com/jcmturner/gokrb5/v8/iana/errorcode"
 	ianaflags "github.com/jcmturner/gokrb5/v8/iana/flags"
 	"github.com/jcmturner/gokrb5/v8/keytab"
+
 	"github.com/jcmturner/gokrb5/v8/messages"
 	"github.com/jcmturner/gokrb5/v8/types"
 
@@ -159,6 +161,20 @@ func (m *Krb5Mech) continueInitiator(tokenIn []byte) (tokenOut []byte, err error
 		// we need another round if we're doing mutual auth - we will receive an AP-REP from the server
 		if m.requestFlags&gssapi.ContextFlagMutual == 0 {
 			m.isEstablished = true
+
+			// if there is no mutual auth, we can't tell the client what our initial sequence number is
+			// MIT and Microsoft use the client's ISN so let's do that, unless we're in Heimdal mode
+			// see https://bugs.openjdk.java.net/browse/JDK-8201814
+			switch AcceptorISN {
+			case DefaultAcceptorISNInitiator:
+				m.theirSequenceNumber = m.ourSequenceNumber
+			case DefaultAcceptorISNZero:
+				m.theirSequenceNumber = 0
+			default:
+				err = fmt.Errorf("gssapi: unknown acceptor-initial-sequence-number policy configured")
+				return
+			}
+
 		} else {
 			m.waitingForMutual = true
 		}
@@ -252,7 +268,8 @@ func (m *Krb5Mech) continueAcceptor(tokenIn []byte) (tokenOut []byte, err error)
 	}
 
 	// stash the sequence number for use in GSS Wrap
-	m.theirSequenceNumber = uint64(gssInToken.aPReq.Authenticator.SeqNumber)
+	var tmpSeq int32 = int32(gssInToken.aPReq.Authenticator.SeqNumber)
+	m.theirSequenceNumber = uint64(tmpSeq)
 
 	// stash the APReq time flags for use in mutual authentication
 	m.clientCTime = gssInToken.aPReq.Authenticator.CTime
@@ -266,6 +283,10 @@ func (m *Krb5Mech) continueAcceptor(tokenIn []byte) (tokenOut []byte, err error)
 	if gssInToken.aPReq.Authenticator.SubKey.KeyType != 0 {
 		m.initiatorSubKey = &gssInToken.aPReq.Authenticator.SubKey
 	}
+
+	// get the context-establishment flags from the authenticator
+	requestedFlags := binary.LittleEndian.Uint32(gssInToken.aPReq.Authenticator.Cksum.Checksum[20:24])
+	m.sessionFlags &= gssapi.ContextFlag(requestedFlags)
 
 	// stash the client's principal name
 	m.peerName = fmt.Sprintf("%s@%s",
@@ -341,7 +362,7 @@ func (m *Krb5Mech) Unwrap(tokenIn []byte) (tokenOut []byte, isSealed bool, err e
 	switch {
 	case wt.Flags&GSSMessageTokenFlagAcceptorSubkey != 0:
 		if m.acceptorSubKey == nil {
-			err = errors.New("gssapi: acceptor subkey not negotiated during token unwrap")
+			err = errors.New("gssapi: acceptor subkey not negotiated, cannot unwrap message")
 			return
 		}
 
@@ -359,14 +380,83 @@ func (m *Krb5Mech) Unwrap(tokenIn []byte) (tokenOut []byte, isSealed bool, err e
 	}
 
 	// Check the sequence number
-	if wt.SequenceNumber != m.theirSequenceNumber {
-		err = fmt.Errorf("gssapi: bad sequence number from peer, got %d, wanted %d", wt.SequenceNumber, m.theirSequenceNumber)
-		return
+	if m.sessionFlags&gssapi.ContextFlagReplay != 0 || m.sessionFlags&gssapi.ContextFlagSequence != 0 {
+		if wt.SequenceNumber != m.theirSequenceNumber {
+			err = fmt.Errorf("gssapi: bad sequence number from peer, got %d, wanted %d", wt.SequenceNumber, m.theirSequenceNumber)
+			return
+		}
 	}
 	m.theirSequenceNumber++
 
 	tokenOut = wt.Payload
 	return
+}
+
+func (m *Krb5Mech) MakeSignature(payload []byte) (tokenOut []byte, err error) {
+	var flags GSSMessageTokenFlag
+
+	if !m.isInitiator {
+		flags |= GSSMessageTokenFlagSentByAcceptor // send by acceptor
+	}
+
+	// use the acceptor subkey if it was negotiated during auth
+	key := m.sessionKey
+	switch {
+	case m.acceptorSubKey != nil:
+		key = m.acceptorSubKey
+		flags |= GSSMessageTokenFlagAcceptorSubkey
+	case m.initiatorSubKey != nil:
+		key = m.initiatorSubKey
+	}
+
+	mt := MICToken{
+		Flags:          flags,
+		SequenceNumber: m.ourSequenceNumber,
+	}
+
+	if err = mt.Sign(payload, *key); err != nil {
+		return
+	}
+
+	tokenOut, err = mt.Marshal()
+	return
+}
+
+func (m *Krb5Mech) VerifySignature(payload []byte, tokenIn []byte) (err error) {
+	mt := MICToken{}
+	if err = mt.Unmarshal(tokenIn); err != nil {
+		return
+	}
+
+	var key types.EncryptionKey
+	switch {
+	case mt.Flags&GSSMessageTokenFlagAcceptorSubkey != 0:
+		if m.acceptorSubKey == nil {
+			err = errors.New("gssapi: acceptor subkey not negotiated, cannot verify MIC")
+			return
+		}
+
+		key = *m.acceptorSubKey
+	case m.initiatorSubKey != nil:
+		key = *m.initiatorSubKey
+	default:
+		key = *m.sessionKey
+	}
+
+	if err = mt.Verify(payload, key, m.isInitiator); err != nil {
+		return
+	}
+
+	// Check the sequence number
+	if m.sessionFlags&gssapi.ContextFlagReplay != 0 || m.sessionFlags&gssapi.ContextFlagSequence != 0 {
+		if mt.SequenceNumber != m.theirSequenceNumber {
+			err = fmt.Errorf("gssapi: bad sequence number from peer, got %d, wanted %d", mt.SequenceNumber, m.theirSequenceNumber)
+			return
+		}
+	}
+	m.theirSequenceNumber++
+
+	return nil
 }
 
 func (m *Krb5Mech) getAPReqMessage() (apreq messages.APReq, err error) {
@@ -393,7 +483,8 @@ func (m *Krb5Mech) getAPReqMessage() (apreq messages.APReq, err error) {
 	}
 
 	// stash the sequence number for use in GSS Wrap
-	m.ourSequenceNumber = uint64(auth.SeqNumber)
+	var seqTmp int32 = int32(auth.SeqNumber)
+	m.ourSequenceNumber = uint64(seqTmp)
 
 	// stash the APReq time flags for use in mutual authentication
 	m.clientCTime = auth.CTime
@@ -420,7 +511,8 @@ func (m *Krb5Mech) getAPRepMessage() (aprep aPRep, err error) {
 		return
 	}
 
-	m.ourSequenceNumber = uint64(encPart.SequenceNumber)
+	var seqTmp int32 = int32(encPart.SequenceNumber)
+	m.ourSequenceNumber = uint64(seqTmp)
 	return
 }
 
@@ -497,9 +589,12 @@ func (m *Krb5Mech) newWrapToken(payload []byte, sealed bool) (token WrapToken, e
 
 	// use the acceptor subkey if it was negotiated during auth
 	key := m.sessionKey
-	if m.acceptorSubKey != nil {
+	switch {
+	case m.acceptorSubKey != nil:
 		key = m.acceptorSubKey
 		flags |= GSSMessageTokenFlagAcceptorSubkey
+	case m.initiatorSubKey != nil:
+		key = m.initiatorSubKey
 	}
 
 	token = WrapToken{
@@ -556,6 +651,16 @@ func verifyAPReq(ktFile string, apreq *messages.APReq, skew time.Duration) (err 
 	err = apreq.DecryptAuthenticator(apreq.Ticket.DecryptedEncPart.Key)
 	if err != nil {
 		krbError = messages.NewKRBError(apreq.Ticket.SName, apreq.Ticket.Realm, errorcode.KRB_AP_ERR_BAD_INTEGRITY, "could not decrypt authenticator")
+		return
+	}
+
+	// Check the authenticator checksum type
+	if apreq.Authenticator.Cksum.CksumType != chksumtype.GSSAPI {
+		krbError = messages.NewKRBError(apreq.Ticket.SName, apreq.Ticket.Realm, errorcode.KRB_AP_ERR_BADMATCH, "wrong authenticator checksum type")
+		return
+	}
+	if len(apreq.Authenticator.Cksum.Checksum) < 24 {
+		krbError = messages.NewKRBError(apreq.Ticket.SName, apreq.Ticket.Realm, errorcode.KRB_AP_ERR_BADMATCH, "authenticator checksum too short")
 		return
 	}
 

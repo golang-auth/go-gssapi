@@ -1,7 +1,4 @@
 package krb5
 
-import "testing"
-
-func TestFoo(t *testing.T) {
-
-}
+// TODO: testing this stuff really needs a KDC or a mock
+//

@@ -414,6 +414,11 @@ int sign_server(s, server_creds, export_ctx)
 
      (void) gss_release_buffer(&min_stat, &msg_buf);
 
+     if (verbose && logger) {
+        fprintf(logger, "Reply MIC token:\n");
+        print_token(&xmit_buf);
+     }
+
      /* Send the signature block to the client */
      if (send_token(s, &xmit_buf) < 0)
         return(-1);

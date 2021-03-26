@@ -9,4 +9,6 @@ type Mech interface {
 	Continue(tokenIn []byte) (tokenOut []byte, err error)
 	Wrap(tokenIn []byte, confidentiality bool) (tokenOut []byte, err error)
 	Unwrap(tokenIn []byte) (tokenOut []byte, isSealed bool, err error)
+	MakeSignature(payload []byte) (tokenOut []byte, err error)
+	VerifySignature(payload []byte, tokenIn []byte) (err error)
 }

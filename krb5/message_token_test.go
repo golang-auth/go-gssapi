@@ -2,11 +2,15 @@ package krb5
 
 import (
 	"encoding/hex"
+	"fmt"
 	"testing"
 
 	"github.com/jcmturner/gokrb5/v8/iana/etypeID"
-	"github.com/jcmturner/gokrb5/v8/types"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/jcmturner/gokrb5/v8/messages"
+	"github.com/jcmturner/gokrb5/v8/types"
+
 )
 
 const (
@@ -23,6 +27,8 @@ const (
 	SAMPLE_TOKEN_SIGNATURE   = "71914A5D08018A97375AB52A"
 	WRAP_TOKEN_SIGNED_HEADER = "050400ff000c0000000000000000007B"
 	SAMPLE_SIGNED_WRAP_TOKEN = "050404ff000c000000000000209bb2cb74657374696e6720313233efed11aa6caa6cf5a7e595a5"
+	SAMPLE_SIGNED_WRAP_TOKEN_WINDOWS = "050400ff000c000c0000000000000000a79b6be6ce749f2f6102c78774657374"
+	SAMPLE_MIC_TOKEN = 
 )
 
 func mk_sample_wrap_token(sealed bool) (wt WrapToken) {
@@ -103,4 +109,30 @@ func TestWrapTokenUnmarshal(t *testing.T) {
 	assert.Equal(t, uint16(0), tok.RRC, "bad RRC")
 	assert.Equal(t, uint64(0x209bb2cb), tok.SequenceNumber, "bad sequence number")
 	assert.Equal(t, true, tok.signedOrSealed, "token is not signed/sealed")
+}
+
+func TestRotateLeft(t *testing.T) {
+	var testData = "abcdefghijklmnop"
+
+	var tests = []struct {
+		rc       uint
+		expected string
+	}{
+		{0, "abcdefghijklmnop"},
+		{1, "bcdefghijklmnopa"},
+		{15, "pabcdefghijklmno"},
+		{16, "abcdefghijklmnop"},
+		{17, "bcdefghijklmnopa"},
+		{32, "abcdefghijklmnop"},
+		{33, "bcdefghijklmnopa"},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("rc=%d", tt.rc), func(t *testing.T) {
+			in := testData
+			out := rotateLeft([]byte(in), tt.rc)
+			assert.Equal(t, tt.expected, string(out))
+		})
+	}
+
 }

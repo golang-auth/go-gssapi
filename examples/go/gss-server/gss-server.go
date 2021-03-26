@@ -51,6 +51,7 @@ func sendToken(conn net.Conn, token []byte) error {
 		return err
 	}
 	debug("Wrote %d bytes to client", n)
+	debug("Token bytes: [% x]", token)
 
 	return nil
 }
@@ -72,6 +73,7 @@ func recvToken(conn net.Conn) (token []byte, err error) {
 		return
 	}
 	debug("Read %d byte token from client", n)
+	debug("Token bytes: [% x]", token)
 
 	return
 }
@@ -138,4 +140,15 @@ func handleConn(conn net.Conn) {
 		protStr = "sealed"
 	}
 	fmt.Printf(`Received %s message: "%s"`+"\n", protStr, msg)
+
+	// generate a MIC token to send back
+	if outToken, err = server.MakeSignature(msg); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	if err = sendToken(conn, outToken); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
 }

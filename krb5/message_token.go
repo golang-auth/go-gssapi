@@ -9,6 +9,7 @@ import (
 
 	"github.com/jcmturner/gokrb5/v8/crypto"
 	"github.com/jcmturner/gokrb5/v8/iana/keyusage"
+
 	"github.com/jcmturner/gokrb5/v8/types"
 )
 
@@ -41,6 +42,7 @@ type MICToken struct {
 	// 5 byte filler (0xFF)
 	SequenceNumber uint64 // 64-bit sequence number
 	Checksum       []byte
+	signed         bool
 }
 
 // RFC 4121 §  4.2.6.2
@@ -152,7 +154,7 @@ func (wt *WrapToken) header() (hdr []byte) {
 }
 
 func (wt *WrapToken) computeChecksum(key types.EncryptionKey) (cksum []byte, err error) {
-	// wrap tokens always use the Seal key usage (where is this documented other than the MIT Kerberos source code?)
+	// wrap tokens always use the Seal key usage (RFC 4121 § 2)
 	usage := keyusage.GSSAPI_INITIATOR_SEAL
 	if wt.Flags&GSSMessageTokenFlagSentByAcceptor != 0 {
 		usage = keyusage.GSSAPI_ACCEPTOR_SEAL
@@ -183,7 +185,7 @@ func (wt *WrapToken) computeChecksum(key types.EncryptionKey) (cksum []byte, err
 // Marshal a token that has already been signed or sealed
 func (wt *WrapToken) Marshal() (token []byte, err error) {
 	if !wt.signedOrSealed {
-		err = errors.New("gssapi: token is not signed or sealed")
+		err = errors.New("gssapi: wrap token is not signed or sealed")
 		return
 	}
 
@@ -340,6 +342,163 @@ func (wt *WrapToken) checkSig(key types.EncryptionKey) (err error) {
 	// remove the signature from the payload
 	wt.Payload = wt.Payload[0 : len(wt.Payload)-int(wt.EC)]
 	wt.signedOrSealed = false
+
+	return
+}
+
+// Ported from MIT source code (gss_krb5int_rotate_left)
+func rotateLeft(buf []byte, rc uint) (out []byte) {
+	defer func() {
+		out = buf
+	}()
+
+	if len(buf) == 0 || rc == 0 {
+		return
+	}
+
+	rc = rc % uint(len(buf))
+	if rc == 0 {
+		return
+	}
+
+	tmpBuf := make([]byte, rc)
+	copy(tmpBuf, buf[0:rc])
+	copy(buf, buf[rc:])
+	copy(buf[uint(len(buf))-rc:], tmpBuf)
+
+	return
+}
+
+// RFC 4121 §  4.2.4
+// Checksum is calculated over the plaintext (supplied token payload), and
+// the token header
+func (mt *MICToken) Sign(payload []byte, key types.EncryptionKey) (err error) {
+	// mic tokens always use the Sign key usage
+	usage := keyusage.GSSAPI_INITIATOR_SIGN
+	if mt.Flags&GSSMessageTokenFlagSentByAcceptor != 0 {
+		usage = keyusage.GSSAPI_ACCEPTOR_SIGN
+	}
+
+	cksumData := make([]byte, 0, msgTokenHdrLen+len(payload))
+	cksumData = append(cksumData, payload...)
+	cksumData = append(cksumData, mt.header()...)
+
+	encType, err := crypto.GetEtype(key.KeyType)
+	if err != nil {
+		err = fmt.Errorf("gssapi: %s", err)
+		return
+	}
+
+	mt.Checksum, err = encType.GetChecksumHash(key.KeyValue, cksumData, uint32(usage))
+	if err != nil {
+		err = fmt.Errorf("gssapi: %s", err)
+		return
+	}
+
+	mt.signed = true
+
+	return
+}
+
+func (mt *MICToken) header() (hdr []byte) {
+	hdr = make([]byte, msgTokenHdrLen)
+
+	tokID := getGssMICTokenId()
+	hdr1 := []byte{
+		tokID[0], tokID[1], // token ID
+		byte(mt.Flags),               // flags
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // filler
+		0x00, 0x00, // EC
+		0x00, 0x00, // RRC
+	}
+
+	copy(hdr, hdr1)
+	binary.BigEndian.PutUint64(hdr[8:], mt.SequenceNumber)
+
+	return
+}
+
+func (mt *MICToken) Marshal() (token []byte, err error) {
+	if !mt.signed {
+		err = errors.New("gssapi: MIC token is not signed")
+	}
+
+	tokenID := getGssMICTokenId()
+	token = make([]byte, msgTokenHdrLen+len(mt.Checksum))
+
+	copy(token[0:], tokenID[:])
+	token[2] = byte(mt.Flags)
+	copy(token[3:8], []byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF})
+	binary.BigEndian.PutUint64(token[8:16], mt.SequenceNumber)
+	copy(token[16:], mt.Checksum)
+
+	return
+}
+
+func (mt *MICToken) Unmarshal(token []byte) (err error) {
+	// zero out the MIC token
+	*mt = MICToken{}
+
+	// token must be at least 16 bytes
+	if len(token) < msgTokenHdrLen {
+		return errors.New("gssapi: wrap token is too short")
+	}
+
+	// Check for 0x60 as the first byte;  As per RFC 4121 § 4.4, these Token IDs
+	// are reserved - and indicate 'Generic GSS-API token framing' that was used by
+	// GSS-API v1, and are not supported in GSS-API v2.. catch that specific case so
+	// we can emmit a useful message
+	if token[0] == 0x60 {
+		return errors.New("gssapi: GSS-API v1 message tokens are not supported")
+	}
+
+	// check token ID
+	tokenID := getGssMICTokenId()
+	if !bytes.Equal(tokenID[:], token[0:2]) {
+		return errors.New("gssapi: bad MIC token ID")
+	}
+
+	mt.Flags = GSSMessageTokenFlag(token[2])
+
+	if !bytes.Equal(token[3:8], []byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF}) {
+		return errors.New("gssapi: invalid MIC token (bad filler)")
+	}
+
+	mt.SequenceNumber = binary.BigEndian.Uint64(token[8:16])
+
+	if len(token) > msgTokenHdrLen {
+		mt.Checksum = token[16:]
+	}
+
+	mt.signed = true
+
+	return
+}
+
+func (mt *MICToken) Verify(payload []byte, key types.EncryptionKey, expectFromAcceptor bool) (err error) {
+	if !mt.signed {
+		return errors.New("gssapi: MIC token is not signed")
+	}
+
+	if len(payload) == 0 {
+		return errors.New("gssapi: cannot verify an empty MIC token payload")
+	}
+
+	isFromAcceptor := mt.Flags&GSSMessageTokenFlagSentByAcceptor != 0
+	if isFromAcceptor != expectFromAcceptor {
+		return fmt.Errorf("gssapi: MIC token from acceptor: %t, expect from acceptor: %t", isFromAcceptor, expectFromAcceptor)
+	}
+
+	// copy the token and use it to sign the supplied payload
+	wt2 := *mt
+	if err = wt2.Sign(payload, key); err != nil {
+		return err
+	}
+
+	// check the token's checksums
+	if !bytes.Equal(mt.Checksum, wt2.Checksum) {
+		return errors.New("gssapi: invalid MIC token checksum")
+	}
 
 	return
 }

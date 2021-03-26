@@ -15,9 +15,9 @@ import (
 
 	"github.com/jcmturner/gofork/encoding/asn1"
 	"github.com/jcmturner/gokrb5/v8/asn1tools"
-	"github.com/jcmturner/gokrb5/v8/messages"
 
 	"github.com/jake-scott/go-gssapi"
+	"github.com/jcmturner/gokrb5/v8/messages"
 )
 
 // GSSAPI KRB5 MechToken IDs.

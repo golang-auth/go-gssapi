@@ -42,7 +42,7 @@ func main() {
 
 	client := gssapi.NewMech("kerberos_v5")
 
-	var flags gssapi.ContextFlag
+	var flags gssapi.ContextFlag = gssapi.ContextFlagInteg | gssapi.ContextFlagConf | gssapi.ContextFlagReplay | gssapi.ContextFlagSequence
 	if *mutual {
 		flags |= gssapi.ContextFlagMutual
 	}
@@ -95,6 +95,21 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+
+	// Receive a MIC token from the server
+	inToken, err = recvToken(conn)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
+	if err = client.VerifySignature([]byte(msg), inToken); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
+	fmt.Println("Successfully verified message signature (MIC) from server")
+
 }
 
 func sendToken(conn net.Conn, token []byte) error {
@@ -110,6 +125,7 @@ func sendToken(conn net.Conn, token []byte) error {
 		return err
 	}
 	debug("Wrote %d bytes to server", n)
+	debug("Token bytes: [% x]", token)
 
 	return nil
 }
@@ -131,6 +147,7 @@ func recvToken(conn net.Conn) (token []byte, err error) {
 		return
 	}
 	debug("Read %d byte token from server", n)
+	debug("Token bytes: [% x]", token)
 
 	return
 }

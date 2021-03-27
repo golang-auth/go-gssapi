@@ -9,6 +9,7 @@
 
 go-gssapi is a pure Golang implementation of the GSS-API version 2 specification ([RFC 2743](https://tools.ietf.org/html/rfc2743)).  It uses the pure [Golang Kerberos implementation](https://github.com/jcmturner/gokrb5/tree/master/v8) to obtain Kerberos tickets from and cryptographic operations.
 
+Documentation at https://pkg.go.dev/github.com/jake-scott/go-gssapi
 
 ## Implemented functionality
 

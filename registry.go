@@ -24,6 +24,8 @@ func Register(name string, f MechFactory) {
 	mechs[name] = f
 }
 
+// IsRegistered can be used to find out whether a named
+// mechanism is registered or not
 func IsRegistered(name string) bool {
 	name = strings.ToLower(name)
 	_, ok := mechs[name]
@@ -31,6 +33,7 @@ func IsRegistered(name string) bool {
 	return ok
 }
 
+// NewMech returns a mechanism context by name
 func NewMech(name string) Mech {
 	name = strings.ToLower(name)
 	f, ok := mechs[name]
@@ -42,6 +45,7 @@ func NewMech(name string) Mech {
 	return nil
 }
 
+// Mechs returns the list of registered mechanism names
 func Mechs() (l []string) {
 	l = make([]string, 0, len(mechs))
 

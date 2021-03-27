@@ -12,6 +12,8 @@ const (
 	ContextFlagInteg                            // integrity available
 )
 
+// FlagList returns a slice of individual flags derived from the
+// composite value f
 func FlagList(f ContextFlag) (fl []ContextFlag) {
 	t := ContextFlag(1)
 	for i := 0; i < 32; i++ {
@@ -25,6 +27,7 @@ func FlagList(f ContextFlag) (fl []ContextFlag) {
 	return
 }
 
+// FlagName returns a human-readable description of a context flag value
 func FlagName(f ContextFlag) string {
 	switch f {
 	case ContextFlagDeleg:

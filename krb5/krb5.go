@@ -37,11 +37,17 @@ var clockSkew = time.Second * 10
 type acceptorISN int
 
 const (
+	// DefaultAcceptorISNInitiator is the acceptor ISN policy that uses the Initiator's initial sequence number
+	// as the Acceptor ISN when not performing mutual authentication.  Use this for compatibility with MIT.
 	DefaultAcceptorISNInitiator acceptorISN = iota
+
+	// DefaultAcceptorISNZero is the acceptor ISN policy that uses zero as the Acceptor ISN when not
+	// performing mutual authentication.  Use this for compatibility with Heimdal.
 	DefaultAcceptorISNZero
 )
 
 // AcceptorISN default acceptor initial sequence number: use the initiator's ISN if there is no mutual auth
+// Set this to DefaultAcceptorISNZero for compatibility with Heimdal Kerberos.
 var AcceptorISN acceptorISN = DefaultAcceptorISNInitiator
 
 type Krb5Mech struct {

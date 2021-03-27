@@ -1,3 +1,7 @@
+// Copyright 2021 Jake Scott. All rights reserved.
+// Use of this source code is governed by the Apache License
+// version 2.0 that can be found in the LICENSE file.
+
 package gssapi
 
 import "strings"
@@ -24,6 +28,8 @@ func Register(name string, f MechFactory) {
 	mechs[name] = f
 }
 
+// IsRegistered can be used to find out whether a named
+// mechanism is registered or not
 func IsRegistered(name string) bool {
 	name = strings.ToLower(name)
 	_, ok := mechs[name]
@@ -31,6 +37,7 @@ func IsRegistered(name string) bool {
 	return ok
 }
 
+// NewMech returns a mechanism context by name
 func NewMech(name string) Mech {
 	name = strings.ToLower(name)
 	f, ok := mechs[name]
@@ -42,6 +49,7 @@ func NewMech(name string) Mech {
 	return nil
 }
 
+// Mechs returns the list of registered mechanism names
 func Mechs() (l []string) {
 	l = make([]string, 0, len(mechs))
 

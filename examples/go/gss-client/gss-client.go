@@ -1,3 +1,7 @@
+// Copyright 2021 Jake Scott. All rights reserved.
+// Use of this source code is governed by the Apache License
+// version 2.0 that can be found in the LICENSE file.
+
 package main
 
 import (
@@ -8,8 +12,8 @@ import (
 	"net"
 	"os"
 
-	"github.com/jake-scott/go-gssapi"
-	_ "github.com/jake-scott/go-gssapi/krb5"
+	"github.com/jake-scott/go-gssapi/v2"
+	_ "github.com/jake-scott/go-gssapi/v2/krb5"
 )
 
 var _debug bool

@@ -30,7 +30,6 @@
 #include <string.h>
 
 #include <gssapi/gssapi.h>
-#include <gssapi/gssapi_ext.h>
 #include "gss-misc.h"
 
 #include <stdlib.h>
@@ -123,7 +122,7 @@ int send_token(s, tok)
      } else if (ret != tok->length) {
          if (display_file)
              fprintf(display_file, 
-                     "sending token data: %d of %d bytes written\n", 
+                     "sending token data: %d of %ld bytes written\n", 
                      ret, tok->length);
          return -1;
      }
@@ -185,7 +184,7 @@ int recv_token(s, tok)
           free(tok->value);
           return -1;
      } else if (ret != tok->length) {
-          fprintf(stderr, "sending token data: %d of %d bytes written\n", 
+          fprintf(stderr, "sending token data: %d of %ld bytes written\n", 
                   ret, tok->length);
           free(tok->value);
           return -1;
@@ -199,13 +198,13 @@ static void display_status_1(m, code, type)
      OM_uint32 code;
      int type;
 {
-     OM_uint32 maj_stat, min_stat;
+     OM_uint32 min_stat;
      gss_buffer_desc msg;
      OM_uint32 msg_ctx;
      
      msg_ctx = 0;
      while (1) {
-          maj_stat = gss_display_status(&min_stat, code,
+          gss_display_status(&min_stat, code,
                                        type, GSS_C_NULL_OID,
                                        &msg_ctx, &msg);
           if (display_file)

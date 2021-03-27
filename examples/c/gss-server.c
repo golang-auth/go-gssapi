@@ -31,7 +31,6 @@
 #include <ctype.h>
 
 #include <gssapi/gssapi.h>
-#include <gssapi/gssapi_ext.h>
 #include "gss-misc.h"
 
 #include <string.h>
@@ -141,7 +140,7 @@ int server_establish_context(s, server_creds, context, client_name, \
                return -1;
 
           if (verbose && logger) {
-              fprintf(logger, "Received token (size=%d): \n", recv_tok.length);
+              fprintf(logger, "Received token (size=%ld): \n", recv_tok.length);
               print_token(&recv_tok);
           }
 
@@ -163,7 +162,7 @@ int server_establish_context(s, server_creds, context, client_name, \
           if (send_tok.length != 0) {
               if (verbose && logger) {
                   fprintf(logger,
-                          "Sending accept_sec_context token (size=%d):\n",
+                          "Sending accept_sec_context token (size=%ld):\n",
                           send_tok.length);
                   print_token(&send_tok);
               }
@@ -293,7 +292,7 @@ int export_context(context)
         }
         gettimeofday(&tm2, (struct timezone *)0);
         if (verbose && logger)
-                fprintf(logger, "Exported context: %d bytes, %7.4f seconds\n",
+                fprintf(logger, "Exported context: %ld bytes, %7.4f seconds\n",
                         context_token.length, timeval_subtract(&tm2, &tm1));
 
         fprintf(logger, "Exported context bytes:\n");
@@ -357,7 +356,7 @@ int sign_server(s, server_creds, export_ctx)
      gss_buffer_desc client_name, xmit_buf, msg_buf;
      gss_ctx_id_t context;
      OM_uint32 maj_stat, min_stat;
-     int i, conf_state, ret_flags;
+     int conf_state, ret_flags;
      char       *cp;
      
      /* Establish a context with the client */

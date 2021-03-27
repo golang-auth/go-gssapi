@@ -1,3 +1,7 @@
+// Copyright 2021 Jake Scott. All rights reserved.
+// Use of this source code is governed by the Apache License
+// version 2.0 that can be found in the LICENSE file.
+
 package krb5
 
 import (
@@ -28,7 +32,7 @@ func TestKRB5TokenApreq_Unmarshal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error unmarshalling KRB5Token: %v", err)
 	}
-	assert.Equal(t, OID(), mt.oID, "KRB5Token OID not as expected.")
+	assert.Equal(t, oID(), mt.oID, "KRB5Token OID not as expected.")
 	assert.Equal(t, []byte{1, 0}, mt.tokID, "TokID not as expected")
 	assert.NotNil(t, mt.aPReq)
 	assert.Nil(t, mt.aPRep)
@@ -50,7 +54,7 @@ func TestKRB5TokenAprep_Unmarshal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error unmarshalling KRB5Token: %v", err)
 	}
-	assert.Equal(t, OID(), mt.oID, "KRB5Token OID not as expected.")
+	assert.Equal(t, oID(), mt.oID, "KRB5Token OID not as expected.")
 	assert.Equal(t, []byte{2, 0}, mt.tokID, "TokID not as expected")
 	assert.Nil(t, mt.aPReq)
 	assert.NotNil(t, mt.aPRep)
@@ -74,24 +78,24 @@ func TestKRB5TokenKrberror_Unmarshal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error unmarshalling KRB5Token: %v", err)
 	}
-	assert.Equal(t, OID(), mt.oID, "KRB5Token OID not as expected.")
+	assert.Equal(t, oID(), mt.oID, "KRB5Token OID not as expected.")
 	assert.Equal(t, []byte{3, 0}, mt.tokID, "TokID not as expected")
 	assert.Nil(t, mt.aPReq)
 	assert.Nil(t, mt.aPRep)
 	assert.NotNil(t, mt.kRBError)
 	assert.Equal(t, msgtype.KRB_ERROR, mt.kRBError.MsgType, "KRB5Token KRB_ERROR does not have the right message type.")
-	assert.Equal(t, int32(SAMPLE_ERROR), mt.kRBError.ErrorCode, "KRB5Token KRB_ERROR has the wrong error code.")
+	assert.Equal(t, int32(SampleError), mt.kRBError.ErrorCode, "KRB5Token KRB_ERROR has the wrong error code.")
 	assert.Equal(t, "ATHENA.MIT.EDU", mt.kRBError.Realm, "KRB5Token KRB_ERROR has the wrong realm.")
-	assert.Equal(t, SAMPLE_DATA, mt.kRBError.EText, "KRB5Token KRB_ERROR has the wrong error test.")
+	assert.Equal(t, SampleData, mt.kRBError.EText, "KRB5Token KRB_ERROR has the wrong error test.")
 }
 
 func TestKrb5TokenApreq_Marshal(t *testing.T) {
 	t.Parallel()
 
-	apreq := ktest_make_sample_ap_req()
+	apreq := ktestMakeSampleApReq()
 
 	mt := kRB5Token{
-		oID:   OID(),
+		oID:   oID(),
 		tokID: []byte{1, 0},
 		aPReq: &apreq,
 	}
@@ -112,10 +116,10 @@ func TestKrb5TokenApreq_Marshal(t *testing.T) {
 func TestKrb5TokenAprep_Marshal(t *testing.T) {
 	t.Parallel()
 
-	aprep := ktest_make_sample_ap_rep()
+	aprep := ktestMakeSampleApRep()
 
 	mt := kRB5Token{
-		oID:   OID(),
+		oID:   oID(),
 		tokID: []byte{2, 0},
 		aPRep: &aprep,
 	}
@@ -136,10 +140,10 @@ func TestKrb5TokenAprep_Marshal(t *testing.T) {
 func TestKrb5TokenKrberror_Marshal(t *testing.T) {
 	t.Parallel()
 
-	krberr := ktest_make_sample_error()
+	krberr := ktestMakeSampleError()
 
 	mt := kRB5Token{
-		oID:      OID(),
+		oID:      oID(),
 		tokID:    []byte{3, 0},
 		kRBError: &krberr,
 	}

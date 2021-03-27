@@ -37,7 +37,6 @@
 #include <stdbool.h>
 
 #include <gssapi/gssapi.h>
-#include <gssapi/gssapi_ext.h>
 #include "gss-misc.h"
 
 void usage()
@@ -188,7 +187,7 @@ int client_establish_context(s, service_name, req_flags,  oid,
                (void) gss_release_buffer(&min_stat, &recv_tok);
 
           if (send_tok.length != 0) {
-               printf("Sending init_sec_context token (size=%d)...",
+               printf("Sending init_sec_context token (size=%ld)...",
                      send_tok.length);
                if (send_token(s, &send_tok) < 0) {
                     (void) gss_release_buffer(&min_stat, &send_tok);
@@ -227,7 +226,7 @@ void read_file(file_name, in_buf)
     char                *file_name;
     gss_buffer_t        in_buf;
 {
-    int fd, bytes_in, count;
+    int fd, count;
     struct stat stat_buf;
     
     if ((fd = open(file_name, O_RDONLY, 0)) < 0) {
@@ -248,7 +247,7 @@ void read_file(file_name, in_buf)
 
     if ((in_buf->value = malloc(in_buf->length)) == 0) {
         fprintf(stderr, \
-            "Couldn't allocate %d byte buffer for reading file\n",
+            "Couldn't allocate %ld byte buffer for reading file\n",
             in_buf->length);
         exit(1);
     }
@@ -262,7 +261,7 @@ void read_file(file_name, in_buf)
         exit(1);
     }
     if (count < in_buf->length)
-        fprintf(stderr, "Warning, only read in %d bytes, expected %d\n",
+        fprintf(stderr, "Warning, only read in %d bytes, expected %ld\n",
                 count, in_buf->length);
 }
 
@@ -391,7 +390,7 @@ int call_server(host, port, oid, service_name, req_flag, msg, use_file, seal)
          display_status("converting oid->string", maj_stat, min_stat);
          return -1;
      }
-     fprintf(stderr, "Mechanism %.*s supports %d names\n",
+     fprintf(stderr, "Mechanism %.*s supports %ld names\n",
              (int) oid_name.length, (char *) oid_name.value,
              mech_names->count);
      (void) gss_release_buffer(&min_stat, &oid_name);
@@ -404,7 +403,7 @@ int call_server(host, port, oid, service_name, req_flag, msg, use_file, seal)
              display_status("converting oid->string", maj_stat, min_stat);
              return -1;
          }
-         fprintf(stderr, "  %d: %.*s\n", i,
+         fprintf(stderr, "  %ld: %.*s\n", i,
                  (int) oid_name.length, (char *) oid_name.value);
 
          (void) gss_release_buffer(&min_stat, &oid_name);

@@ -22,9 +22,9 @@ import (
 
 // GSSAPI KRB5 MechToken IDs.
 const (
-	TOK_ID_KRB_AP_REQ = "0100"
-	TOK_ID_KRB_AP_REP = "0200"
-	TOK_ID_KRB_ERROR  = "0300"
+	TokenIDKrbAPReq = "0100"
+	TokenIDKrbAPRep = "0200"
+	TokenIDKrbError = "0300"
 )
 
 // kRB5Token context token implementation for GSSAPI.
@@ -43,17 +43,17 @@ func (m *kRB5Token) marshal() (outTok []byte, err error) {
 	b = append(b, m.tokID...)
 	var tb []byte
 	switch hex.EncodeToString(m.tokID) {
-	case TOK_ID_KRB_AP_REQ:
+	case TokenIDKrbAPReq:
 		tb, err = m.aPReq.Marshal()
 		if err != nil {
 			err = fmt.Errorf("gssapi: error marshalling AP-REQ for MechToken: %v", err)
 		}
-	case TOK_ID_KRB_AP_REP:
+	case TokenIDKrbAPRep:
 		tb, err = m.aPRep.marshal()
 		if err != nil {
 			err = fmt.Errorf("gssapi: error marshalling AP-REP for MechToken: %v", err)
 		}
-	case TOK_ID_KRB_ERROR:
+	case TokenIDKrbError:
 		tb, err = m.kRBError.Marshal()
 		if err != nil {
 			err = fmt.Errorf("gssapi: error marshalling KRB-ERROR for MechToken: %v", err)
@@ -88,21 +88,21 @@ func (m *kRB5Token) unmarshal(b []byte) error {
 	}
 	m.tokID = r[0:2]
 	switch hex.EncodeToString(m.tokID) {
-	case TOK_ID_KRB_AP_REQ:
+	case TokenIDKrbAPReq:
 		var a messages.APReq
 		err = a.Unmarshal(r[2:])
 		if err != nil {
 			return fmt.Errorf("gssapi: error unmarshalling KRB5Token AP_REQ: %v", err)
 		}
 		m.aPReq = &a
-	case TOK_ID_KRB_AP_REP:
+	case TokenIDKrbAPRep:
 		var a aPRep
 		err = a.unmarshal(r[2:])
 		if err != nil {
 			return fmt.Errorf("gssapi: error unmarshalling KRB5Token AP_REP: %v", err)
 		}
 		m.aPRep = &a
-	case TOK_ID_KRB_ERROR:
+	case TokenIDKrbError:
 		var a messages.KRBError
 		err = a.Unmarshal(r[2:])
 		if err != nil {
@@ -114,7 +114,7 @@ func (m *kRB5Token) unmarshal(b []byte) error {
 }
 
 // Create the GSSAPI checksum for the authenticator.  This isn't really
-// a checksum, it is a way to carry GSSAPI level context infromation in
+// a checksum, it is a way to carry GSSAPI level context information in
 // the Kerberos AP-RREQ message. See RFC 4121 § 4.1.1
 func newAuthenticatorChksum(flags gssapi.ContextFlag) []byte {
 	// 24 octet minimum length, up to and including context-establishment flags

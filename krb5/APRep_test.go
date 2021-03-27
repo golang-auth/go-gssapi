@@ -42,7 +42,7 @@ func TestUnmarshalEncAPRepPart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unmarshal error: %v", err)
 	}
-	//Parse the test time value into a time.Time type
+	// Parse the test time value into a time.Time type
 	tt, _ := time.Parse(testdata.TEST_TIME_FORMAT, testdata.TEST_TIME)
 
 	assert.Equal(t, tt, a.CTime, "CTime not as expected")
@@ -63,7 +63,7 @@ func TestUnmarshalEncAPRepPart_optionalsNULL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unmarshal error: %v", err)
 	}
-	//Parse the test time value into a time.Time type
+	// Parse the test time value into a time.Time type
 	tt, _ := time.Parse(testdata.TEST_TIME_FORMAT, testdata.TEST_TIME)
 
 	assert.Equal(t, tt, a.CTime, "CTime not as expected")
@@ -77,7 +77,7 @@ func TestAPRepEncPartMarshall(t *testing.T) {
 	want, err := hex.DecodeString(testdata.MarshaledKRB5ap_rep_enc_part)
 	assert.Nil(t, err, "error not expected decoding test data")
 
-	encpart := ktest_make_sample_ap_rep_enc_part()
+	encpart := ktestMakeSampleAPReqEncPart()
 
 	b, err := encpart.marshal()
 	assert.Nil(t, err, "enc part marshal error not expected")
@@ -91,7 +91,7 @@ func TestAPRepEncPartMarshall_optionalsNULL(t *testing.T) {
 	want, err := hex.DecodeString(testdata.MarshaledKRB5ap_rep_enc_partOptionalsNULL)
 	assert.Nil(t, err, "error not expected decoding test data")
 
-	encpart := ktest_make_sample_ap_rep_enc_part()
+	encpart := ktestMakeSampleAPReqEncPart()
 	encpart.SequenceNumber = 0
 	encpart.Subkey = types.EncryptionKey{}
 
@@ -106,7 +106,7 @@ func TestAprepMarshal(t *testing.T) {
 	want, err := hex.DecodeString(testdata.MarshaledKRB5ap_rep)
 	assert.Nil(t, err, "error not expected decoding test data")
 
-	aprep := ktest_make_sample_ap_rep()
+	aprep := ktestMakeSampleApRep()
 
 	b, err := aprep.marshal()
 	assert.Nil(t, err, "enc part marshal error not expected")

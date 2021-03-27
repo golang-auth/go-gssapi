@@ -58,12 +58,12 @@ type WrapToken struct {
 }
 
 // Return the 2 bytes identifying a GSS API Wrap token
-func getGssWrapTokenId() [2]byte {
+func getGssWrapTokenID() [2]byte {
 	return [2]byte{0x05, 0x04}
 }
 
 // Return the 2 bytes identifying a GSS API MIC token
-func getGssMICTokenId() [2]byte {
+func getGssMICTokenID() [2]byte {
 	return [2]byte{0x04, 0x04}
 }
 
@@ -73,7 +73,7 @@ func getGssMICTokenId() [2]byte {
 // The function modifies the Payload and EC/RRC fields of the WrapToken
 func (wt *WrapToken) Sign(key types.EncryptionKey) error {
 	if wt.Payload == nil {
-		return errors.New("gssapi: attemp to sign token with no payload")
+		return errors.New("gssapi: attempt to sign token with no payload")
 	}
 	if wt.signedOrSealed {
 		return errors.New("gssapi: attempt to sign a signed/sealed token")
@@ -101,7 +101,7 @@ func (wt *WrapToken) Sign(key types.EncryptionKey) error {
 // Encrypts the Payload and sets EC/RRC on the WrapToken
 func (wt *WrapToken) Seal(key types.EncryptionKey) (err error) {
 	if wt.Payload == nil {
-		return errors.New("gssapi: attemp to encrypt token with no payload")
+		return errors.New("gssapi: attempt to encrypt token with no payload")
 	}
 	if wt.signedOrSealed {
 		return errors.New("gssapi: attempt to seal a signed/sealed token")
@@ -132,13 +132,13 @@ func (wt *WrapToken) Seal(key types.EncryptionKey) (err error) {
 	wt.RRC = 0
 	wt.signedOrSealed = true
 
-	return
+	return err
 }
 
 func (wt *WrapToken) header() (hdr []byte) {
 	hdr = make([]byte, msgTokenHdrLen)
 
-	tokID := getGssWrapTokenId()
+	tokID := getGssWrapTokenID()
 	hdr1 := []byte{
 		tokID[0], tokID[1], // token ID
 		byte(wt.Flags), // flags
@@ -189,7 +189,7 @@ func (wt *WrapToken) Marshal() (token []byte, err error) {
 		return
 	}
 
-	tokenID := getGssWrapTokenId()
+	tokenID := getGssWrapTokenID()
 	token = make([]byte, msgTokenHdrLen+len(wt.Payload))
 
 	copy(token[0:], tokenID[:])
@@ -222,7 +222,7 @@ func (wt *WrapToken) Unmarshal(token []byte) (err error) {
 	}
 
 	// check token ID
-	tokenID := getGssWrapTokenId()
+	tokenID := getGssWrapTokenID()
 	if !bytes.Equal(tokenID[:], token[0:2]) {
 		return errors.New("gssapi: bad wrap token ID")
 	}
@@ -263,8 +263,6 @@ func (wt *WrapToken) VerifyAndDecode(key types.EncryptionKey, expectFromAcceptor
 	} else {
 		return false, wt.checkSig(key)
 	}
-
-	return
 }
 
 func (wt *WrapToken) decrypt(key types.EncryptionKey) (err error) {
@@ -307,7 +305,7 @@ func (wt *WrapToken) decrypt(key types.EncryptionKey) (err error) {
 	wt.Payload = decrypted[0 : len(decrypted)-msgTokenHdrLen-int(wt.EC)]
 	wt.signedOrSealed = false
 
-	return
+	return err
 }
 
 func (wt *WrapToken) checkSig(key types.EncryptionKey) (err error) {
@@ -343,7 +341,7 @@ func (wt *WrapToken) checkSig(key types.EncryptionKey) (err error) {
 	wt.Payload = wt.Payload[0 : len(wt.Payload)-int(wt.EC)]
 	wt.signedOrSealed = false
 
-	return
+	return err
 }
 
 // Ported from MIT source code (gss_krb5int_rotate_left)
@@ -356,7 +354,7 @@ func rotateLeft(buf []byte, rc uint) (out []byte) {
 		return
 	}
 
-	rc = rc % uint(len(buf))
+	rc %= uint(len(buf))
 	if rc == 0 {
 		return
 	}
@@ -403,7 +401,7 @@ func (mt *MICToken) Sign(payload []byte, key types.EncryptionKey) (err error) {
 func (mt *MICToken) header() (hdr []byte) {
 	hdr = make([]byte, msgTokenHdrLen)
 
-	tokID := getGssMICTokenId()
+	tokID := getGssMICTokenID()
 	hdr1 := []byte{
 		tokID[0], tokID[1], // token ID
 		byte(mt.Flags),               // flags
@@ -423,7 +421,7 @@ func (mt *MICToken) Marshal() (token []byte, err error) {
 		err = errors.New("gssapi: MIC token is not signed")
 	}
 
-	tokenID := getGssMICTokenId()
+	tokenID := getGssMICTokenID()
 	token = make([]byte, msgTokenHdrLen+len(mt.Checksum))
 
 	copy(token[0:], tokenID[:])
@@ -453,7 +451,7 @@ func (mt *MICToken) Unmarshal(token []byte) (err error) {
 	}
 
 	// check token ID
-	tokenID := getGssMICTokenId()
+	tokenID := getGssMICTokenID()
 	if !bytes.Equal(tokenID[:], token[0:2]) {
 		return errors.New("gssapi: bad MIC token ID")
 	}
@@ -472,7 +470,7 @@ func (mt *MICToken) Unmarshal(token []byte) (err error) {
 
 	mt.signed = true
 
-	return
+	return err
 }
 
 func (mt *MICToken) Verify(payload []byte, key types.EncryptionKey, expectFromAcceptor bool) (err error) {

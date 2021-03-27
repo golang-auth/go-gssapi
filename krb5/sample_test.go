@@ -15,26 +15,26 @@ import (
 
 // from src/tests/asn.1/ktest.h
 const (
-	SAMPLE_USEC           = 123456
-	SAMPLE_SEQ_NUMBER     = 17
-	SAMPLE_NONCE          = 42
-	SAMPLE_FLAGS          = 0xFEDCBA98
-	SAMPLE_ERROR          = 0x3C
-	SAMPLE_PRINCIPAL_NAME = "hftsai/extra@ATHENA.MIT.EDU"
-	SAMPLE_DATA           = "krb5data"
+	SampleUSec          = 123456
+	SampleSeqNumber     = 17
+	SampleNonce         = 42
+	SampleFlags         = 0xFEDCBA98
+	SampleError         = 0x3C
+	SamplePrincipalName = "hftsai/extra@ATHENA.MIT.EDU"
+	SampleData          = "krb5data"
 )
 
-func ktest_make_sample_ap_rep_enc_part() encAPRepPart {
+func ktestMakeSampleAPReqEncPart() encAPRepPart {
 	tm, _ := time.Parse(testdata.TEST_TIME_FORMAT, testdata.TEST_TIME)
 	return encAPRepPart{
 		CTime:          tm,
-		Cusec:          SAMPLE_USEC,
-		Subkey:         ktest_make_sample_keyblock(),
-		SequenceNumber: SAMPLE_SEQ_NUMBER,
+		Cusec:          SampleUSec,
+		Subkey:         ktestMakeSampleKeyblock(),
+		SequenceNumber: SampleSeqNumber,
 	}
 }
 
-func ktest_make_sample_keyblock() types.EncryptionKey {
+func ktestMakeSampleKeyblock() types.EncryptionKey {
 	kv := []byte("12345678")
 	return types.EncryptionKey{
 		KeyType:  1,
@@ -42,7 +42,7 @@ func ktest_make_sample_keyblock() types.EncryptionKey {
 	}
 }
 
-func ktest_make_sample_enc_data() types.EncryptedData {
+func ktestMakeSampleEncData() types.EncryptedData {
 	return types.EncryptedData{
 		EType:  0,
 		KVNO:   5,
@@ -50,56 +50,56 @@ func ktest_make_sample_enc_data() types.EncryptedData {
 	}
 }
 
-func ktest_make_sample_ticket() messages.Ticket {
-	pn, realm := types.ParseSPNString(SAMPLE_PRINCIPAL_NAME)
+func ktestMakeSampleTicket() messages.Ticket {
+	pn, realm := types.ParseSPNString(SamplePrincipalName)
 	return messages.Ticket{
 		TktVNO:  5,
 		Realm:   realm,
 		SName:   pn,
-		EncPart: ktest_make_sample_enc_data(),
+		EncPart: ktestMakeSampleEncData(),
 	}
 }
 
-func ktest_make_sample_ap_req() (aprep messages.APReq) {
+func ktestMakeSampleApReq() (aprep messages.APReq) {
 	aprep = messages.APReq{
 		PVNO:                   5,
 		MsgType:                msgtype.KRB_AP_REQ,
 		APOptions:              types.NewKrbFlags(),
-		Ticket:                 ktest_make_sample_ticket(),
-		EncryptedAuthenticator: ktest_make_sample_enc_data(),
+		Ticket:                 ktestMakeSampleTicket(),
+		EncryptedAuthenticator: ktestMakeSampleEncData(),
 	}
 
-	binary.BigEndian.PutUint32(aprep.APOptions.Bytes[0:], SAMPLE_FLAGS)
+	binary.BigEndian.PutUint32(aprep.APOptions.Bytes[0:], SampleFlags)
 	return
 }
 
-func ktest_make_sample_ap_rep() (aprep aPRep) {
+func ktestMakeSampleApRep() (aprep aPRep) {
 	aprep = aPRep{
 		PVNO:    5,
 		MsgType: msgtype.KRB_AP_REP,
-		EncPart: ktest_make_sample_enc_data(),
+		EncPart: ktestMakeSampleEncData(),
 	}
 
 	return
 }
 
-func ktest_make_sample_error() (krberr messages.KRBError) {
-	pn, realm := types.ParseSPNString(SAMPLE_PRINCIPAL_NAME)
+func ktestMakeSampleError() (krberr messages.KRBError) {
+	pn, realm := types.ParseSPNString(SamplePrincipalName)
 	tm, _ := time.Parse(testdata.TEST_TIME_FORMAT, testdata.TEST_TIME)
 	krberr = messages.KRBError{
 		PVNO:      5,
 		MsgType:   msgtype.KRB_ERROR,
 		CTime:     tm,
-		Cusec:     SAMPLE_USEC,
+		Cusec:     SampleUSec,
 		STime:     tm,
-		Susec:     SAMPLE_USEC,
-		ErrorCode: SAMPLE_ERROR,
+		Susec:     SampleUSec,
+		ErrorCode: SampleError,
 		CRealm:    realm,
 		CName:     pn,
 		Realm:     realm,
 		SName:     pn,
-		EText:     SAMPLE_DATA,
-		EData:     []byte(SAMPLE_DATA),
+		EText:     SampleData,
+		EData:     []byte(SampleData),
 	}
 
 	return

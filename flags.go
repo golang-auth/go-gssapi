@@ -19,7 +19,7 @@ func FlagList(f ContextFlag) (fl []ContextFlag) {
 			fl = append(fl, t)
 		}
 
-		t = t << 1
+		t <<= 1
 	}
 
 	return

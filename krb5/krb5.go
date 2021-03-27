@@ -17,7 +17,6 @@ import (
 	"github.com/jcmturner/gokrb5/v8/config"
 	"github.com/jcmturner/gokrb5/v8/credentials"
 	"github.com/jcmturner/gokrb5/v8/iana/chksumtype"
-	"github.com/jcmturner/gokrb5/v8/iana/errorcode"
 	ianaerrcode "github.com/jcmturner/gokrb5/v8/iana/errorcode"
 	ianaflags "github.com/jcmturner/gokrb5/v8/iana/flags"
 	"github.com/jcmturner/gokrb5/v8/keytab"
@@ -42,7 +41,7 @@ const (
 	DefaultAcceptorISNZero
 )
 
-// default acceptor initial sequence number: use the initiator's ISN if there is no mutual auth
+// AcceptorISN default acceptor initial sequence number: use the initiator's ISN if there is no mutual auth
 var AcceptorISN acceptorISN = DefaultAcceptorISNInitiator
 
 type Krb5Mech struct {
@@ -129,14 +128,12 @@ func (m *Krb5Mech) Continue(tokenIn []byte) (tokenOut []byte, err error) {
 	} else {
 		return m.continueAcceptor(tokenIn)
 	}
-
-	return
 }
 
 func (m *Krb5Mech) continueInitiator(tokenIn []byte) (tokenOut []byte, err error) {
 	// first time, create the first context-establishment token
 	//
-	if tokenIn == nil || len(tokenIn) == 0 {
+	if len(tokenIn) == 0 {
 		// Create a Kerberos AP-REQ message with GSSAPI checksum
 		var apreq messages.APReq
 		apreq, err = m.getAPReqMessage()
@@ -145,7 +142,7 @@ func (m *Krb5Mech) continueInitiator(tokenIn []byte) (tokenOut []byte, err error
 		}
 
 		// Create the GSSAPI token
-		tb, _ := hex.DecodeString(TOK_ID_KRB_AP_REQ)
+		tb, _ := hex.DecodeString(TokenIDKrbAPReq)
 		gssToken := kRB5Token{
 			oID:   OID(),
 			tokID: tb,
@@ -174,7 +171,6 @@ func (m *Krb5Mech) continueInitiator(tokenIn []byte) (tokenOut []byte, err error
 				err = fmt.Errorf("gssapi: unknown acceptor-initial-sequence-number policy configured")
 				return
 			}
-
 		} else {
 			m.waitingForMutual = true
 		}
@@ -184,7 +180,7 @@ func (m *Krb5Mech) continueInitiator(tokenIn []byte) (tokenOut []byte, err error
 
 	// called again due to a previous ContinueNeeded result ?..
 	if !m.waitingForMutual {
-		err = fmt.Errorf("gssapi: context is not ready, call Start to initalize a new context")
+		err = fmt.Errorf("gssapi: context is not ready, call Start to initialize a new context")
 		return
 	}
 
@@ -230,8 +226,7 @@ func (m *Krb5Mech) continueInitiator(tokenIn []byte) (tokenOut []byte, err error
 	m.waitingForMutual = false
 	m.sessionFlags |= gssapi.ContextFlagMutual
 
-	return
-
+	return tokenOut, nil
 }
 
 func (m *Krb5Mech) continueAcceptor(tokenIn []byte) (tokenOut []byte, err error) {
@@ -295,7 +290,7 @@ func (m *Krb5Mech) continueAcceptor(tokenIn []byte) (tokenOut []byte, err error)
 
 	// if the client requested mutual authentication, send them an AP-REP message
 	if types.IsFlagSet(&gssInToken.aPReq.APOptions, ianaflags.APOptionMutualRequired) {
-		tb, _ := hex.DecodeString(TOK_ID_KRB_AP_REP)
+		tb, _ := hex.DecodeString(TokenIDKrbAPRep)
 		gssOutToken := kRB5Token{
 			oID:   OID(),
 			tokID: tb,
@@ -314,7 +309,6 @@ func (m *Krb5Mech) continueAcceptor(tokenIn []byte) (tokenOut []byte, err error)
 		}
 
 		m.sessionFlags |= gssapi.ContextFlagMutual
-
 	} else {
 		// if there is no mutual auth, we can't tell the client what our initial sequence number is
 		// MIT and Microsoft use the client's ISN so let's do that, unless we're in Heimdal mode
@@ -328,12 +322,11 @@ func (m *Krb5Mech) continueAcceptor(tokenIn []byte) (tokenOut []byte, err error)
 			err = fmt.Errorf("gssapi: unknown acceptor-initial-sequence-number policy configured")
 			return
 		}
-
 	}
 
 	// we're done from an acceptor perspective
 	m.isEstablished = true
-	return
+	return tokenOut, nil
 }
 
 func (m *Krb5Mech) PeerName() string {
@@ -389,7 +382,7 @@ func (m *Krb5Mech) Unwrap(tokenIn []byte) (tokenOut []byte, isSealed bool, err e
 	m.theirSequenceNumber++
 
 	tokenOut = wt.Payload
-	return
+	return tokenOut, isSealed, nil
 }
 
 func (m *Krb5Mech) MakeSignature(payload []byte) (tokenOut []byte, err error) {
@@ -493,7 +486,7 @@ func (m *Krb5Mech) getAPReqMessage() (apreq messages.APReq, err error) {
 	m.clientCTime = auth.CTime
 	m.clientCusec = auth.Cusec
 
-	return
+	return apreq, err
 }
 
 func (m *Krb5Mech) getAPRepMessage() (aprep aPRep, err error) {
@@ -526,7 +519,7 @@ func (m *Krb5Mech) getAPRepMessage() (aprep aPRep, err error) {
 	}
 
 	m.ourSequenceNumber = uint64(seqNum)
-	return
+	return aprep, err
 }
 
 func (m *Krb5Mech) krbClientInit(service string) (err error) {
@@ -560,7 +553,6 @@ func (m *Krb5Mech) krbClientInit(service string) (err error) {
 	m.peerName = fmt.Sprintf("%s@%s", tkt.SName.PrincipalNameString(), tkt.Realm)
 
 	return nil
-
 }
 
 func krbConfFile() string {
@@ -627,7 +619,7 @@ func (m *Krb5Mech) newWrapToken(payload []byte, sealed bool) (token WrapToken, e
 		m.ourSequenceNumber++ // only bump the sequence number if everything is good
 	}
 
-	return
+	return token, err
 }
 
 // must return useful Kerberos error codes here so we can respond appropriately to the client if necessary
@@ -643,14 +635,12 @@ func verifyAPReq(ktFile string, apreq *messages.APReq, skew time.Duration) (err 
 	}
 
 	err = apreq.Ticket.DecryptEncPart(kt, &apreq.Ticket.SName)
-	if err != nil {
-		if _, ok := err.(messages.KRBError); ok {
-			krbError = err
-			return
-		} else {
-			krbError = messages.NewKRBError(apreq.Ticket.SName, apreq.Ticket.Realm, ianaerrcode.KRB_AP_ERR_BAD_INTEGRITY, "could not decrypt ticket")
-			return
-		}
+	if _, ok := err.(messages.KRBError); ok {
+		krbError = err
+		return
+	} else if err != nil {
+		krbError = messages.NewKRBError(apreq.Ticket.SName, apreq.Ticket.Realm, ianaerrcode.KRB_AP_ERR_BAD_INTEGRITY, "could not decrypt ticket")
+		return
 	}
 
 	// Check time validity of ticket
@@ -663,23 +653,23 @@ func verifyAPReq(ktFile string, apreq *messages.APReq, skew time.Duration) (err 
 	// Decrypt authenticator with session key from ticket's encrypted part
 	err = apreq.DecryptAuthenticator(apreq.Ticket.DecryptedEncPart.Key)
 	if err != nil {
-		krbError = messages.NewKRBError(apreq.Ticket.SName, apreq.Ticket.Realm, errorcode.KRB_AP_ERR_BAD_INTEGRITY, "could not decrypt authenticator")
+		krbError = messages.NewKRBError(apreq.Ticket.SName, apreq.Ticket.Realm, ianaerrcode.KRB_AP_ERR_BAD_INTEGRITY, "could not decrypt authenticator")
 		return
 	}
 
 	// Check the authenticator checksum type
 	if apreq.Authenticator.Cksum.CksumType != chksumtype.GSSAPI {
-		krbError = messages.NewKRBError(apreq.Ticket.SName, apreq.Ticket.Realm, errorcode.KRB_AP_ERR_BADMATCH, "wrong authenticator checksum type")
+		krbError = messages.NewKRBError(apreq.Ticket.SName, apreq.Ticket.Realm, ianaerrcode.KRB_AP_ERR_BADMATCH, "wrong authenticator checksum type")
 		return
 	}
 	if len(apreq.Authenticator.Cksum.Checksum) < 24 {
-		krbError = messages.NewKRBError(apreq.Ticket.SName, apreq.Ticket.Realm, errorcode.KRB_AP_ERR_BADMATCH, "authenticator checksum too short")
+		krbError = messages.NewKRBError(apreq.Ticket.SName, apreq.Ticket.Realm, ianaerrcode.KRB_AP_ERR_BADMATCH, "authenticator checksum too short")
 		return
 	}
 
 	// Check CName in authenticator is the same as that in the ticket
 	if !apreq.Authenticator.CName.Equal(apreq.Ticket.DecryptedEncPart.CName) {
-		krbError = messages.NewKRBError(apreq.Ticket.SName, apreq.Ticket.Realm, errorcode.KRB_AP_ERR_BADMATCH, "CName in Authenticator does not match that in service ticket")
+		krbError = messages.NewKRBError(apreq.Ticket.SName, apreq.Ticket.Realm, ianaerrcode.KRB_AP_ERR_BADMATCH, "CName in Authenticator does not match that in service ticket")
 		return
 	}
 
@@ -687,11 +677,11 @@ func verifyAPReq(ktFile string, apreq *messages.APReq, skew time.Duration) (err 
 	ct := apreq.Authenticator.CTime.Add(time.Duration(apreq.Authenticator.Cusec) * time.Microsecond)
 	t := time.Now().UTC()
 	if t.Sub(ct) > skew || ct.Sub(t) > skew {
-		krbError = messages.NewKRBError(apreq.Ticket.SName, apreq.Ticket.Realm, errorcode.KRB_AP_ERR_SKEW, fmt.Sprintf("clock skew with client too large. greater than %v seconds", skew))
+		krbError = messages.NewKRBError(apreq.Ticket.SName, apreq.Ticket.Realm, ianaerrcode.KRB_AP_ERR_SKEW, fmt.Sprintf("clock skew with client too large. greater than %v seconds", skew))
 		return
 	}
 
-	return
+	return nil, nil
 }
 
 func mkGssErrKrbCode(code int32, message string) (token []byte, err error) {
@@ -700,7 +690,7 @@ func mkGssErrKrbCode(code int32, message string) (token []byte, err error) {
 }
 
 func mkGssErrFromKrbErr(ke messages.KRBError) (token []byte, err error) {
-	tb, _ := hex.DecodeString(TOK_ID_KRB_ERROR)
+	tb, _ := hex.DecodeString(TokenIDKrbError)
 	gssToken := kRB5Token{
 		oID:      OID(),
 		tokID:    tb,

@@ -268,8 +268,8 @@ func (m *Krb5Mech) continueAcceptor(tokenIn []byte) (tokenOut []byte, err error)
 	}
 
 	// stash the sequence number for use in GSS Wrap
-	var tmpSeq int32 = int32(gssInToken.aPReq.Authenticator.SeqNumber)
-	m.theirSequenceNumber = uint64(tmpSeq)
+	// Authenticator.SeqNumber is actually a 32 bit number (in the protocol), so the cast here is safe
+	m.theirSequenceNumber = uint64(gssInToken.aPReq.Authenticator.SeqNumber)
 
 	// stash the APReq time flags for use in mutual authentication
 	m.clientCTime = gssInToken.aPReq.Authenticator.CTime
@@ -466,6 +466,9 @@ func (m *Krb5Mech) getAPReqMessage() (apreq messages.APReq, err error) {
 		return
 	}
 
+	// MIT compatibility
+	auth.SeqNumber &= 0x3fffffff
+
 	auth.Cksum = types.Checksum{
 		CksumType: chksumtype.GSSAPI,
 		Checksum:  newAuthenticatorChksum(m.requestFlags),
@@ -483,8 +486,8 @@ func (m *Krb5Mech) getAPReqMessage() (apreq messages.APReq, err error) {
 	}
 
 	// stash the sequence number for use in GSS Wrap
-	var seqTmp int32 = int32(auth.SeqNumber)
-	m.ourSequenceNumber = uint64(seqTmp)
+	// Authenticator.SeqNumber is actually a 32 bit number (in the protocol), so the cast here is safe
+	m.ourSequenceNumber = uint64(auth.SeqNumber)
 
 	// stash the APReq time flags for use in mutual authentication
 	m.clientCTime = auth.CTime
@@ -499,10 +502,21 @@ func (m *Krb5Mech) getAPRepMessage() (aprep aPRep, err error) {
 		return
 	}
 
+	/*
+	 * Work around implementation incompatibilities by not generating
+	 * initial sequence numbers greater than 2^30.  Previous MIT
+	 * implementations use signed sequence numbers, so initial
+	 * sequence numbers 2^31 to 2^32-1 inclusive will be rejected.
+	 * Letting the maximum initial sequence number be 2^30-1 allows
+	 * for about 2^30 messages to be sent before wrapping into
+	 * "negative" numbers.
+	 */
+	seqNum := seq.Int64() & 0x3fffffff
+
 	encPart := encAPRepPart{
 		CTime:          m.clientCTime, // copied from the APReq
 		Cusec:          m.clientCusec,
-		SequenceNumber: seq.Int64(),
+		SequenceNumber: seqNum,
 	}
 
 	aprep, err = newAPRep(*m.ticket, *m.sessionKey, encPart)
@@ -511,8 +525,7 @@ func (m *Krb5Mech) getAPRepMessage() (aprep aPRep, err error) {
 		return
 	}
 
-	var seqTmp int32 = int32(encPart.SequenceNumber)
-	m.ourSequenceNumber = uint64(seqTmp)
+	m.ourSequenceNumber = uint64(seqNum)
 	return
 }
 

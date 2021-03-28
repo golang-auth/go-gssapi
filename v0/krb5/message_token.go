@@ -1,3 +1,7 @@
+// Copyright 2021 Jake Scott. All rights reserved.
+// Use of this source code is governed by the Apache License
+// version 2.0 that can be found in the LICENSE file.
+
 package krb5
 
 import (
@@ -27,18 +31,18 @@ const (
 )
 
 // RFC 4121 §  4.2.2
-type GSSMessageTokenFlag uint8
+type gSSMessageTokenFlag uint8
 
 const (
-	GSSMessageTokenFlagSentByAcceptor GSSMessageTokenFlag = 1 << iota
-	GSSMessageTokenFlagSealed
-	GSSMessageTokenFlagAcceptorSubkey
+	gSSMessageTokenFlagSentByAcceptor gSSMessageTokenFlag = 1 << iota
+	gSSMessageTokenFlagSealed
+	gSSMessageTokenFlagAcceptorSubkey
 )
 
 // RFC 4121 §  4.2.6.1
-type MICToken struct {
+type mICToken struct {
 	// 2 byte token ID (0x04, 0x04)
-	Flags GSSMessageTokenFlag
+	Flags gSSMessageTokenFlag
 	// 5 byte filler (0xFF)
 	SequenceNumber uint64 // 64-bit sequence number
 	Checksum       []byte
@@ -46,9 +50,9 @@ type MICToken struct {
 }
 
 // RFC 4121 §  4.2.6.2
-type WrapToken struct {
+type wrapToken struct {
 	// 2 byte token ID (0x05, 0x04)
-	Flags GSSMessageTokenFlag
+	Flags gSSMessageTokenFlag
 	// 1 byte filler (0xFF)
 	EC             uint16 // "Extra count" - the checksum or padding length
 	RRC            uint16 // right rotation count for SSPI (we don't support this yet)
@@ -71,7 +75,7 @@ func getGssMICTokenID() [2]byte {
 // Checksum is calculated over the plaintext (supplied token payload), and
 // the token header with EC and RRC set to zero
 // The function modifies the Payload and EC/RRC fields of the WrapToken
-func (wt *WrapToken) Sign(key types.EncryptionKey) error {
+func (wt *wrapToken) Sign(key types.EncryptionKey) error {
 	if wt.Payload == nil {
 		return errors.New("gssapi: attempt to sign token with no payload")
 	}
@@ -99,7 +103,7 @@ func (wt *WrapToken) Sign(key types.EncryptionKey) error {
 
 // RFC 4121 §  4.2.4
 // Encrypts the Payload and sets EC/RRC on the WrapToken
-func (wt *WrapToken) Seal(key types.EncryptionKey) (err error) {
+func (wt *wrapToken) Seal(key types.EncryptionKey) (err error) {
 	if wt.Payload == nil {
 		return errors.New("gssapi: attempt to encrypt token with no payload")
 	}
@@ -112,7 +116,7 @@ func (wt *WrapToken) Seal(key types.EncryptionKey) (err error) {
 	toEncrypt = append(toEncrypt, wt.header()...)
 
 	usage := keyusage.GSSAPI_INITIATOR_SEAL
-	if wt.Flags&GSSMessageTokenFlagSentByAcceptor != 0 {
+	if wt.Flags&gSSMessageTokenFlagSentByAcceptor != 0 {
 		usage = keyusage.GSSAPI_ACCEPTOR_SEAL
 	}
 
@@ -135,7 +139,7 @@ func (wt *WrapToken) Seal(key types.EncryptionKey) (err error) {
 	return err
 }
 
-func (wt *WrapToken) header() (hdr []byte) {
+func (wt *wrapToken) header() (hdr []byte) {
 	hdr = make([]byte, msgTokenHdrLen)
 
 	tokID := getGssWrapTokenID()
@@ -153,10 +157,10 @@ func (wt *WrapToken) header() (hdr []byte) {
 	return
 }
 
-func (wt *WrapToken) computeChecksum(key types.EncryptionKey) (cksum []byte, err error) {
+func (wt *wrapToken) computeChecksum(key types.EncryptionKey) (cksum []byte, err error) {
 	// wrap tokens always use the Seal key usage (RFC 4121 § 2)
 	usage := keyusage.GSSAPI_INITIATOR_SEAL
-	if wt.Flags&GSSMessageTokenFlagSentByAcceptor != 0 {
+	if wt.Flags&gSSMessageTokenFlagSentByAcceptor != 0 {
 		usage = keyusage.GSSAPI_ACCEPTOR_SEAL
 	}
 
@@ -183,7 +187,7 @@ func (wt *WrapToken) computeChecksum(key types.EncryptionKey) (cksum []byte, err
 }
 
 // Marshal a token that has already been signed or sealed
-func (wt *WrapToken) Marshal() (token []byte, err error) {
+func (wt *wrapToken) Marshal() (token []byte, err error) {
 	if !wt.signedOrSealed {
 		err = errors.New("gssapi: wrap token is not signed or sealed")
 		return
@@ -204,9 +208,9 @@ func (wt *WrapToken) Marshal() (token []byte, err error) {
 }
 
 // Unmarshal a signed or sealed token
-func (wt *WrapToken) Unmarshal(token []byte) (err error) {
+func (wt *wrapToken) Unmarshal(token []byte) (err error) {
 	// zero everything in the token
-	*wt = WrapToken{}
+	*wt = wrapToken{}
 
 	// token must be at least 16 bytes
 	if len(token) < msgTokenHdrLen {
@@ -227,7 +231,7 @@ func (wt *WrapToken) Unmarshal(token []byte) (err error) {
 		return errors.New("gssapi: bad wrap token ID")
 	}
 
-	wt.Flags = GSSMessageTokenFlag(token[2])
+	wt.Flags = gSSMessageTokenFlag(token[2])
 
 	if token[3] != msgTokenFillerByte {
 		return errors.New("gssapi: invalid wrap token (bad filler)")
@@ -245,7 +249,7 @@ func (wt *WrapToken) Unmarshal(token []byte) (err error) {
 	return nil
 }
 
-func (wt *WrapToken) VerifyAndDecode(key types.EncryptionKey, expectFromAcceptor bool) (isSealed bool, err error) {
+func (wt *wrapToken) VerifyAndDecode(key types.EncryptionKey, expectFromAcceptor bool) (isSealed bool, err error) {
 	if !wt.signedOrSealed {
 		return false, errors.New("gssapi: wrap token is not signed or sealed")
 	}
@@ -253,21 +257,21 @@ func (wt *WrapToken) VerifyAndDecode(key types.EncryptionKey, expectFromAcceptor
 		return false, errors.New("gssapi: cannot verify an empty wrap token payload")
 	}
 
-	isFromAcceptor := wt.Flags&GSSMessageTokenFlagSentByAcceptor != 0
+	isFromAcceptor := wt.Flags&gSSMessageTokenFlagSentByAcceptor != 0
 	if isFromAcceptor != expectFromAcceptor {
 		return false, fmt.Errorf("gssapi: wrap token from acceptor: %t, expect from acceptor: %t", isFromAcceptor, expectFromAcceptor)
 	}
 
-	if wt.Flags&GSSMessageTokenFlagSealed != 0 {
+	if wt.Flags&gSSMessageTokenFlagSealed != 0 {
 		return true, wt.decrypt(key)
 	} else {
 		return false, wt.checkSig(key)
 	}
 }
 
-func (wt *WrapToken) decrypt(key types.EncryptionKey) (err error) {
+func (wt *wrapToken) decrypt(key types.EncryptionKey) (err error) {
 	usage := keyusage.GSSAPI_INITIATOR_SEAL
-	if wt.Flags&GSSMessageTokenFlagSentByAcceptor != 0 {
+	if wt.Flags&gSSMessageTokenFlagSentByAcceptor != 0 {
 		usage = keyusage.GSSAPI_ACCEPTOR_SEAL
 	}
 
@@ -291,7 +295,7 @@ func (wt *WrapToken) decrypt(key types.EncryptionKey) (err error) {
 	decryptedHeader := decrypted[len(decrypted)-msgTokenHdrLen:]
 
 	// check that plain text header wasn't modified
-	wt2 := WrapToken{}
+	wt2 := wrapToken{}
 	if err = wt2.Unmarshal(decryptedHeader); err != nil {
 		return
 	}
@@ -308,7 +312,7 @@ func (wt *WrapToken) decrypt(key types.EncryptionKey) (err error) {
 	return err
 }
 
-func (wt *WrapToken) checkSig(key types.EncryptionKey) (err error) {
+func (wt *wrapToken) checkSig(key types.EncryptionKey) (err error) {
 	encType, err := crypto.GetEtype(key.KeyType)
 	if err != nil {
 		return fmt.Errorf("gssapi: wrap token: %s", err)
@@ -370,10 +374,10 @@ func rotateLeft(buf []byte, rc uint) (out []byte) {
 // RFC 4121 §  4.2.4
 // Checksum is calculated over the plaintext (supplied token payload), and
 // the token header
-func (mt *MICToken) Sign(payload []byte, key types.EncryptionKey) (err error) {
+func (mt *mICToken) Sign(payload []byte, key types.EncryptionKey) (err error) {
 	// mic tokens always use the Sign key usage
 	usage := keyusage.GSSAPI_INITIATOR_SIGN
-	if mt.Flags&GSSMessageTokenFlagSentByAcceptor != 0 {
+	if mt.Flags&gSSMessageTokenFlagSentByAcceptor != 0 {
 		usage = keyusage.GSSAPI_ACCEPTOR_SIGN
 	}
 
@@ -398,7 +402,7 @@ func (mt *MICToken) Sign(payload []byte, key types.EncryptionKey) (err error) {
 	return
 }
 
-func (mt *MICToken) header() (hdr []byte) {
+func (mt *mICToken) header() (hdr []byte) {
 	hdr = make([]byte, msgTokenHdrLen)
 
 	tokID := getGssMICTokenID()
@@ -416,7 +420,7 @@ func (mt *MICToken) header() (hdr []byte) {
 	return
 }
 
-func (mt *MICToken) Marshal() (token []byte, err error) {
+func (mt *mICToken) Marshal() (token []byte, err error) {
 	if !mt.signed {
 		err = errors.New("gssapi: MIC token is not signed")
 	}
@@ -433,9 +437,9 @@ func (mt *MICToken) Marshal() (token []byte, err error) {
 	return
 }
 
-func (mt *MICToken) Unmarshal(token []byte) (err error) {
+func (mt *mICToken) Unmarshal(token []byte) (err error) {
 	// zero out the MIC token
-	*mt = MICToken{}
+	*mt = mICToken{}
 
 	// token must be at least 16 bytes
 	if len(token) < msgTokenHdrLen {
@@ -456,7 +460,7 @@ func (mt *MICToken) Unmarshal(token []byte) (err error) {
 		return errors.New("gssapi: bad MIC token ID")
 	}
 
-	mt.Flags = GSSMessageTokenFlag(token[2])
+	mt.Flags = gSSMessageTokenFlag(token[2])
 
 	if !bytes.Equal(token[3:8], []byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF}) {
 		return errors.New("gssapi: invalid MIC token (bad filler)")
@@ -473,7 +477,7 @@ func (mt *MICToken) Unmarshal(token []byte) (err error) {
 	return err
 }
 
-func (mt *MICToken) Verify(payload []byte, key types.EncryptionKey, expectFromAcceptor bool) (err error) {
+func (mt *mICToken) Verify(payload []byte, key types.EncryptionKey, expectFromAcceptor bool) (err error) {
 	if !mt.signed {
 		return errors.New("gssapi: MIC token is not signed")
 	}
@@ -482,7 +486,7 @@ func (mt *MICToken) Verify(payload []byte, key types.EncryptionKey, expectFromAc
 		return errors.New("gssapi: cannot verify an empty MIC token payload")
 	}
 
-	isFromAcceptor := mt.Flags&GSSMessageTokenFlagSentByAcceptor != 0
+	isFromAcceptor := mt.Flags&gSSMessageTokenFlagSentByAcceptor != 0
 	if isFromAcceptor != expectFromAcceptor {
 		return fmt.Errorf("gssapi: MIC token from acceptor: %t, expect from acceptor: %t", isFromAcceptor, expectFromAcceptor)
 	}

@@ -1,3 +1,51 @@
+// Copyright 2021 Jake Scott. All rights reserved.
+// Use of this source code is governed by the Apache License
+// version 2.0 that can be found in the LICENSE file.
+
+/*
+Package krb5 provides the pure-Go implementation of the GSS-API interface
+Kerberos mechanism (RFC 4121).
+
+Normally, this package would be imported by application code (eg. in its
+main package) in order to register the Kerberos V mechanism.  Application
+code that uses GSS-API would import the generic github.com/jake-scott/go-gssapi/v0
+package instead and obtain a handle to this mechanism from the registry by
+passing the name "kerberos_v5" or the OID "1.2.840.113554.1.2.2", eg :
+
+Main Package
+
+A relatively high-level package should include the mechanisms that the
+application is to use.  The idea is that the mechanisms that are supported
+in an application can be managed in one place, without changing any of
+the lower level code that uses the GSS-API functionality:
+
+ package main
+ import (
+	 _ "github.com/jake-scott/go-gssapi/v0/krb5"
+	 "stuff"
+ )
+
+ stuff.doStuff("kerberos_v5")
+
+
+Implementation package
+
+The package that uses GSS-API should accept the name of the mechanism to
+use, and use that name to obtain an instance of that mechanism-specific
+implementation:
+
+ package stuff
+ import "github.com/jake-scott/go-gssapi/v0"
+
+ func doStuff(mech) {
+ 	ctx := gssapi.NewMech(mech)
+    ...
+ }
+
+See Also
+
+github.com/jake-scott/go-gssapi/v0
+*/
 package krb5
 
 import (
@@ -24,7 +72,7 @@ import (
 	"github.com/jcmturner/gokrb5/v8/messages"
 	"github.com/jcmturner/gokrb5/v8/types"
 
-	"github.com/jake-scott/go-gssapi"
+	"github.com/jake-scott/go-gssapi/v0"
 )
 
 func init() {
@@ -32,10 +80,25 @@ func init() {
 	gssapi.Register("1.2.840.113554.1.2.2}", NewKrb5Mech)
 }
 
-var clockSkew = time.Second * 10
+// ClockSkew defines the maximum tolerable difference between the two peers
+// of a GSS-API context, and defaults to 10 seconds.  Increase this number if
+// there is poor syncronisation between client and server nodes.  Decrease
+// the value to enhance security where there is good synchronisation.
+var ClockSkew = time.Second * 10
 
 type acceptorISN int
 
+// These constants define how the Acceptor initial sequence number is derived
+// when the context does not use mutual authentication.  In this case, the
+// Acceptor does not have the opportunity to communicate its own sequence number
+// to the Initiator.  Two different schemes are in use:
+//
+// 1.  Acceptor uses the Initiator's initial sequence number
+//
+// 2.  The Acceptor ISN is zero
+//
+// The default is (1), but may be changed to (2) by setting AcceptorISN to
+// the value DefaultAcceptorISNZero.
 const (
 	// DefaultAcceptorISNInitiator is the acceptor ISN policy that uses the Initiator's initial sequence number
 	// as the Acceptor ISN when not performing mutual authentication.  Use this for compatibility with MIT.
@@ -46,10 +109,14 @@ const (
 	DefaultAcceptorISNZero
 )
 
-// AcceptorISN default acceptor initial sequence number: use the initiator's ISN if there is no mutual auth
+// AcceptorISN holds the default Acceptor-Initial-Sequence derivation policy
+// for contexts not using mutual authentication.  The default provides
+// compatibility with MIT Kerberos.
 // Set this to DefaultAcceptorISNZero for compatibility with Heimdal Kerberos.
 var AcceptorISN acceptorISN = DefaultAcceptorISNInitiator
 
+// krb5Mech is the implementation of the Mech interface for the
+// Kerberos V mechanism
 type Krb5Mech struct {
 	krbClient           *client.Client
 	isInitiator         bool
@@ -69,23 +136,40 @@ type Krb5Mech struct {
 	peerName            string
 }
 
+// NewMech returns a new Kerberos V mechanism context.  This function is
+// registered with the GSS-API registry and is used by gssapi.NewMech()
+// when a caller requests an instance of the "kerberos_v5" mechanism.
 func NewKrb5Mech() gssapi.Mech {
 	return &Krb5Mech{}
 }
 
-func OID() asn1.ObjectIdentifier {
+func oID() asn1.ObjectIdentifier {
 	return asn1.ObjectIdentifier{1, 2, 840, 113554, 1, 2, 2}
 }
 
+// IsEstablished returns false until the Krb5Mech context has been negotiated
+// and the context is ready to use for exchanging messages.
 func (m Krb5Mech) IsEstablished() bool {
 	return m.isEstablished
 }
 
+// ContextFlags returns the subset of requested context flags that are available
+// and may change during establishmane of the context.  The Initiator and
+// Acceptor should examine the flags before using the context for message
+// exchange, to verify that the state of the context matches the appliation
+// security requirements.
 func (m Krb5Mech) ContextFlags() (f gssapi.ContextFlag) {
 	return m.sessionFlags
 }
 
-// RFC 4121 § 4.1
+// Accept is used by a GSS-API Acceptor to begin context
+// negotiation with a remote Initiator.
+//
+// If provided, serviceName is the name of a service principal
+// to use from the keytab.  If not supplied, any principal in the
+// keytab matching the request will be used.
+//
+// See: RFC 4121 § 4.1
 func (m *Krb5Mech) Accept(serviceName string) (err error) {
 	m.isEstablished = false
 	m.waitingForMutual = false
@@ -100,6 +184,21 @@ func (m *Krb5Mech) Accept(serviceName string) (err error) {
 	return
 }
 
+// Initiate is used by a GSS-API Initiator to start the
+// context negotiation process with a remote Acceptor.
+//
+// serverName is the name of the service principal to use when
+// obtaining a Kerberos ticket.
+//
+// flags represent the desired security properties of the context
+//
+// It is highly recommended to make use of mutual authentication wherever
+// possible and to include replay detection:
+//
+//  gssapi.ContextFlagMutual | gssapi.ContextFlagInteg  |gssapi.ContextFlagReplay
+//
+// Most users should also include gssapi.ContextFlagConf to enable the use
+// of message sealing.
 func (m *Krb5Mech) Initiate(serviceName string, requestFlags gssapi.ContextFlag) (err error) {
 	m.isEstablished = false
 	m.waitingForMutual = false
@@ -123,6 +222,13 @@ func (m *Krb5Mech) Initiate(serviceName string, requestFlags gssapi.ContextFlag)
 	return
 }
 
+// Continue is called in a loop by Initiators and Acceptors after
+// first calling one of Initiate or Accept.
+//
+// tokenIn represents a token received from the peer
+// If tokenOut is non-zero, it should be send to the peer
+// The caller should check the result of m.IsEstablished() to determine
+// then the loop should end.
 func (m *Krb5Mech) Continue(tokenIn []byte) (tokenOut []byte, err error) {
 	if m.isEstablished {
 		err = nil
@@ -148,9 +254,9 @@ func (m *Krb5Mech) continueInitiator(tokenIn []byte) (tokenOut []byte, err error
 		}
 
 		// Create the GSSAPI token
-		tb, _ := hex.DecodeString(TokenIDKrbAPReq)
+		tb, _ := hex.DecodeString(tokenIDKrbAPReq)
 		gssToken := kRB5Token{
-			oID:   OID(),
+			oID:   oID(),
 			tokID: tb,
 			aPReq: &apreq,
 		}
@@ -262,7 +368,7 @@ func (m *Krb5Mech) continueAcceptor(tokenIn []byte) (tokenOut []byte, err error)
 
 	ktFile := krbKtFile()
 
-	err, krbErr := verifyAPReq(ktFile, gssInToken.aPReq, clockSkew)
+	err, krbErr := verifyAPReq(ktFile, gssInToken.aPReq, ClockSkew)
 	if err != nil {
 		tokenOut, err = mkGssErrFromKrbErr(krbErr.(messages.KRBError))
 		return
@@ -296,9 +402,9 @@ func (m *Krb5Mech) continueAcceptor(tokenIn []byte) (tokenOut []byte, err error)
 
 	// if the client requested mutual authentication, send them an AP-REP message
 	if types.IsFlagSet(&gssInToken.aPReq.APOptions, ianaflags.APOptionMutualRequired) {
-		tb, _ := hex.DecodeString(TokenIDKrbAPRep)
+		tb, _ := hex.DecodeString(tokenIDKrbAPRep)
 		gssOutToken := kRB5Token{
-			oID:   OID(),
+			oID:   oID(),
 			tokID: tb,
 		}
 
@@ -335,10 +441,15 @@ func (m *Krb5Mech) continueAcceptor(tokenIn []byte) (tokenOut []byte, err error)
 	return tokenOut, nil
 }
 
+// PeerName returns the name of the remote peer's Kerberos principal
 func (m *Krb5Mech) PeerName() string {
 	return m.peerName
 }
 
+// Wrap encapsulates the payload in a GSS-API Wap oken that can be passed to the
+// remote peer.  The payload is sealed if confidentiality is requested, and
+// signed if not.  Note that the use of confidentially requires the
+// gssapi.ContextFlagMutual flag to be enabled on the context.
 func (m *Krb5Mech) Wrap(tokenIn []byte, confidentiality bool) (tokenOut []byte, err error) {
 	wt, err := m.newWrapToken(tokenIn, confidentiality)
 	if err != nil {
@@ -349,9 +460,12 @@ func (m *Krb5Mech) Wrap(tokenIn []byte, confidentiality bool) (tokenOut []byte, 
 	return
 }
 
+// Unwrap is used to parse a token created with Wrap().  It returns the original
+// payload after unsealing or verification of the signature.  isSealed can be
+// inspected to determine whether the payload was encrypted or only signed.
 func (m *Krb5Mech) Unwrap(tokenIn []byte) (tokenOut []byte, isSealed bool, err error) {
 	// Unmarshall the token
-	wt := WrapToken{}
+	wt := wrapToken{}
 	if err = wt.Unmarshal(tokenIn); err != nil {
 		err = fmt.Errorf("gssapi: %s", err)
 		return
@@ -359,7 +473,7 @@ func (m *Krb5Mech) Unwrap(tokenIn []byte) (tokenOut []byte, isSealed bool, err e
 
 	var key types.EncryptionKey
 	switch {
-	case wt.Flags&GSSMessageTokenFlagAcceptorSubkey != 0:
+	case wt.Flags&gSSMessageTokenFlagAcceptorSubkey != 0:
 		if m.acceptorSubKey == nil {
 			err = errors.New("gssapi: acceptor subkey not negotiated, cannot unwrap message")
 			return
@@ -391,11 +505,15 @@ func (m *Krb5Mech) Unwrap(tokenIn []byte) (tokenOut []byte, isSealed bool, err e
 	return tokenOut, isSealed, nil
 }
 
+// MakeSignature creates a GSS-API MIC token, containing the signature of
+// payload but not encapsulating any payload.  The MIC token is passed to the
+// peer separately to the payload and can be used by the peer to verify
+// the integrity of that payload.
 func (m *Krb5Mech) MakeSignature(payload []byte) (tokenOut []byte, err error) {
-	var flags GSSMessageTokenFlag
+	var flags gSSMessageTokenFlag
 
 	if !m.isInitiator {
-		flags |= GSSMessageTokenFlagSentByAcceptor // send by acceptor
+		flags |= gSSMessageTokenFlagSentByAcceptor // send by acceptor
 	}
 
 	// use the acceptor subkey if it was negotiated during auth
@@ -403,12 +521,12 @@ func (m *Krb5Mech) MakeSignature(payload []byte) (tokenOut []byte, err error) {
 	switch {
 	case m.acceptorSubKey != nil:
 		key = m.acceptorSubKey
-		flags |= GSSMessageTokenFlagAcceptorSubkey
+		flags |= gSSMessageTokenFlagAcceptorSubkey
 	case m.initiatorSubKey != nil:
 		key = m.initiatorSubKey
 	}
 
-	mt := MICToken{
+	mt := mICToken{
 		Flags:          flags,
 		SequenceNumber: m.ourSequenceNumber,
 	}
@@ -421,15 +539,17 @@ func (m *Krb5Mech) MakeSignature(payload []byte) (tokenOut []byte, err error) {
 	return
 }
 
+// VerifySignature checks the cryptographic signature created by a call
+// to MakeSignature() on the supplied payload.
 func (m *Krb5Mech) VerifySignature(payload []byte, tokenIn []byte) (err error) {
-	mt := MICToken{}
+	mt := mICToken{}
 	if err = mt.Unmarshal(tokenIn); err != nil {
 		return
 	}
 
 	var key types.EncryptionKey
 	switch {
-	case mt.Flags&GSSMessageTokenFlagAcceptorSubkey != 0:
+	case mt.Flags&gSSMessageTokenFlagAcceptorSubkey != 0:
 		if m.acceptorSubKey == nil {
 			err = errors.New("gssapi: acceptor subkey not negotiated, cannot verify MIC")
 			return
@@ -588,14 +708,14 @@ func krbKtFile() string {
 	return strings.TrimPrefix(ktFile, "FILE:")
 }
 
-func (m *Krb5Mech) newWrapToken(payload []byte, sealed bool) (token WrapToken, err error) {
-	var flags GSSMessageTokenFlag
+func (m *Krb5Mech) newWrapToken(payload []byte, sealed bool) (token wrapToken, err error) {
+	var flags gSSMessageTokenFlag
 
 	if !m.isInitiator {
-		flags |= GSSMessageTokenFlagSentByAcceptor // send by acceptor
+		flags |= gSSMessageTokenFlagSentByAcceptor // send by acceptor
 	}
 	if sealed {
-		flags |= GSSMessageTokenFlagSealed // sealed
+		flags |= gSSMessageTokenFlagSealed // sealed
 	}
 
 	// use the acceptor subkey if it was negotiated during auth
@@ -603,12 +723,12 @@ func (m *Krb5Mech) newWrapToken(payload []byte, sealed bool) (token WrapToken, e
 	switch {
 	case m.acceptorSubKey != nil:
 		key = m.acceptorSubKey
-		flags |= GSSMessageTokenFlagAcceptorSubkey
+		flags |= gSSMessageTokenFlagAcceptorSubkey
 	case m.initiatorSubKey != nil:
 		key = m.initiatorSubKey
 	}
 
-	token = WrapToken{
+	token = wrapToken{
 		Flags:          flags,
 		SequenceNumber: m.ourSequenceNumber,
 		Payload:        payload,
@@ -696,9 +816,9 @@ func mkGssErrKrbCode(code int32, message string) (token []byte, err error) {
 }
 
 func mkGssErrFromKrbErr(ke messages.KRBError) (token []byte, err error) {
-	tb, _ := hex.DecodeString(TokenIDKrbError)
+	tb, _ := hex.DecodeString(tokenIDKrbError)
 	gssToken := kRB5Token{
-		oID:      OID(),
+		oID:      oID(),
 		tokID:    tb,
 		kRBError: &ke,
 	}

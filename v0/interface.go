@@ -44,7 +44,7 @@ type Mech interface {
 
 	// Accept is used by a GSS-API Acceptor to begin context
 	// negotiation with a remote Initiator.
-	// If provides, serviceName is the mechanism specific identifier
+	// If provided, serviceName is the mechanism specific identifier
 	// of the local Acceptor
 	Accept(serviceName string) (err error)
 

@@ -1,3 +1,7 @@
+// Copyright 2021 Jake Scott. All rights reserved.
+// Use of this source code is governed by the Apache License
+// version 2.0 that can be found in the LICENSE file.
+
 package krb5
 
 import (
@@ -31,16 +35,16 @@ const (
 	SampleMICToken               = "040404ffffffffff000000000000007Bb479cc6b1a27beb60a815b26"
 )
 
-func mkSampleWrapToken() (wt WrapToken) {
-	return WrapToken{
+func mkSampleWrapToken() (wt wrapToken) {
+	return wrapToken{
 		Flags:          0,
 		SequenceNumber: 123,
 		Payload:        []byte(TestWrapPayload),
 	}
 }
 
-func mkSampleMICToken() (mt MICToken) {
-	return MICToken{
+func mkSampleMICToken() (mt mICToken) {
+	return mICToken{
 		Flags:          4,
 		SequenceNumber: 123,
 	}
@@ -107,7 +111,7 @@ func TestWrapTokenMarshal(t *testing.T) {
 func TestWrapTokenUnmarshal(t *testing.T) {
 	tokBytes, _ := hex.DecodeString(SampleSignedWrapTOken)
 
-	tok := WrapToken{}
+	tok := wrapToken{}
 	err := tok.Unmarshal(tokBytes)
 	assert.NoError(t, err, "Unmarshal of signed token failed")
 
@@ -121,7 +125,7 @@ func TestWrapTokenUnmarshal(t *testing.T) {
 func TestWindowsWrapTokenUnmarshal(t *testing.T) {
 	tokBytes, _ := hex.DecodeString(SampleSignedWrapTokenWindows)
 
-	tok := WrapToken{}
+	tok := wrapToken{}
 	err := tok.Unmarshal(tokBytes)
 	assert.NoError(t, err, "Unmarshal of signed token failed")
 
@@ -194,7 +198,7 @@ func TestMICTokenMarshal(t *testing.T) {
 func TestMICTokenUnmarshal(t *testing.T) {
 	tokBytes, _ := hex.DecodeString(SampleMICToken)
 
-	tok := MICToken{}
+	tok := mICToken{}
 	err := tok.Unmarshal(tokBytes)
 	assert.NoError(t, err, "Unmarshal of MIC token failed")
 

@@ -61,19 +61,19 @@ Import the base `go-gssapi` package where you will use GSS-API, and  the mechani
 ```go
   package myclient
   
-  import "github.com/jake-scott/go-gssapi/v2"
+  import "github.com/jake-scott/go-gssapi"
 ```
 
 ```go
   package main
 
   //  register the Kerberos GSS-API mechsnism
-  import _ "github.com/jake-scott/go-gssapi/v2/krb5"
+  import _ "github.com/jake-scott/go-gssapi/krb5"
 ```
 
 We will maintain major versions of the library in separate Git branches.  To use the latest version in a branch, use `go get` with the branch name, eg :
 
-     go get github.com/jake-scott/go-gssapi/v2@v2
+     go get github.com/jake-scott/go-gssapi@v0
 
 This will result in a concrete version being added to `go.mod`:
 
@@ -82,7 +82,7 @@ module test
 
 go 1.15
 
-require github.com/jake-scott/go-gssapi/v2 v2.0.0-alpha
+require github.com/jake-scott/go-gssapi v0.1.0
 ```
 
 ## Initialization

@@ -1,4 +1,4 @@
-module github.com/jake-scott/go-gssapi/v0
+module github.com/jake-scott/go-gssapi/v2
 
 go 1.15
 

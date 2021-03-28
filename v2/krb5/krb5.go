@@ -8,7 +8,7 @@ Kerberos mechanism (RFC 4121).
 
 Normally, this package would be imported by application code (eg. in its
 main package) in order to register the Kerberos V mechanism.  Application
-code that uses GSS-API would import the generic github.com/jake-scott/go-gssapi/v0
+code that uses GSS-API would import the generic github.com/jake-scott/go-gssapi/v2
 package instead and obtain a handle to this mechanism from the registry by
 passing the name "kerberos_v5" or the OID "1.2.840.113554.1.2.2", eg :
 
@@ -21,7 +21,7 @@ the lower level code that uses the GSS-API functionality:
 
  package main
  import (
-	 _ "github.com/jake-scott/go-gssapi/v0/krb5"
+	 _ "github.com/jake-scott/go-gssapi/v2/krb5"
 	 "stuff"
  )
 
@@ -35,7 +35,7 @@ use, and use that name to obtain an instance of that mechanism-specific
 implementation:
 
  package stuff
- import "github.com/jake-scott/go-gssapi/v0"
+ import "github.com/jake-scott/go-gssapi/v2"
 
  func doStuff(mech) {
  	ctx := gssapi.NewMech(mech)
@@ -44,7 +44,7 @@ implementation:
 
 See Also
 
-github.com/jake-scott/go-gssapi/v0
+github.com/jake-scott/go-gssapi/v2
 */
 package krb5
 
@@ -72,7 +72,7 @@ import (
 	"github.com/jcmturner/gokrb5/v8/messages"
 	"github.com/jcmturner/gokrb5/v8/types"
 
-	"github.com/jake-scott/go-gssapi/v0"
+	"github.com/jake-scott/go-gssapi/v2"
 )
 
 func init() {

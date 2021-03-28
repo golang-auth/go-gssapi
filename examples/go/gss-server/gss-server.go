@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"flag"
 	"fmt"
+	"io"
 	"net"
 	"os"
 
@@ -62,17 +63,18 @@ func sendToken(conn net.Conn, token []byte) error {
 
 func recvToken(conn net.Conn) (token []byte, err error) {
 	szBuff := make([]byte, 4)
-	_, err = conn.Read(szBuff)
+	_, err = io.ReadFull(conn, szBuff)
 	if err != nil {
 		return
 	}
+	debug("Expecting 0x% x byte token from client", szBuff)
 
 	buf := bytes.NewBuffer(szBuff)
 	var tokenSize uint32
 	binary.Read(buf, binary.BigEndian, &tokenSize)
 
 	token = make([]byte, tokenSize)
-	n, err := conn.Read(token)
+	n, err := io.ReadFull(conn, token)
 	if err != nil {
 		return
 	}

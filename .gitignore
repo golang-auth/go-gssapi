@@ -5,6 +5,7 @@
 *.so
 *.dylib
 *.o
+*.class
 
 examples/c/gss-client-c
 examples/c/gss-server-c

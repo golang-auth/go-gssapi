@@ -1,5 +1,7 @@
 package gssapi
 
+import "strings"
+
 type ContextFlag uint32
 
 // GSS-API context flags assigned numbers.
@@ -45,4 +47,13 @@ func FlagName(f ContextFlag) string {
 	}
 
 	return "Unknown"
+}
+
+func (f ContextFlag) String() string {
+	var names []string
+	for _, flag := range FlagList(f) {
+		names = append(names, FlagName(flag))
+	}
+
+	return strings.Join(names, ", ")
 }

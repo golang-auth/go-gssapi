@@ -29,4 +29,8 @@ tools:
 	GO111MODULE=off go get -u github.com/client9/misspell/cmd/misspell
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOPATH)/bin v1.31.0
 
-
+.PHONY: fmt
+fmt:
+	@echo "==> Fixing source code with gofmt..."
+	@# This logic should match the search logic in scripts/gofmtcheck.sh
+	find . -name '*.go' | grep -v vendor | xargs gofmt -s -w

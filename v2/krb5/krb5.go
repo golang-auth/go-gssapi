@@ -8,7 +8,7 @@ Kerberos mechanism (RFC 4121).
 
 Normally, this package would be imported by application code (eg. in its
 main package) in order to register the Kerberos V mechanism.  Application
-code that uses GSS-API would import the generic github.com/jake-scott/go-gssapi/v2
+code that uses GSS-API would import the generic github.com/golang-auth/go-gssapi/v2
 package instead and obtain a handle to this mechanism from the registry by
 passing the name "kerberos_v5" or the OID "1.2.840.113554.1.2.2", eg :
 
@@ -21,7 +21,7 @@ the lower level code that uses the GSS-API functionality:
 
  package main
  import (
-	 _ "github.com/jake-scott/go-gssapi/v2/krb5"
+	 _ "github.com/golang-auth/go-gssapi/v2/krb5"
 	 "stuff"
  )
 
@@ -35,7 +35,7 @@ use, and use that name to obtain an instance of that mechanism-specific
 implementation:
 
  package stuff
- import "github.com/jake-scott/go-gssapi/v2"
+ import "github.com/golang-auth/go-gssapi/v2"
 
  func doStuff(mech) {
  	ctx := gssapi.NewMech(mech)
@@ -44,7 +44,7 @@ implementation:
 
 See Also
 
-github.com/jake-scott/go-gssapi/v2
+github.com/golang-auth/go-gssapi/v2
 */
 package krb5
 
@@ -61,18 +61,20 @@ import (
 	"time"
 
 	"github.com/jcmturner/gofork/encoding/asn1"
+	"github.com/jcmturner/gokrb5/crypto/etype"
+	"github.com/jcmturner/gokrb5/iana/etypeID"
 	"github.com/jcmturner/gokrb5/v8/client"
 	"github.com/jcmturner/gokrb5/v8/config"
 	"github.com/jcmturner/gokrb5/v8/credentials"
+	"github.com/jcmturner/gokrb5/v8/crypto"
 	"github.com/jcmturner/gokrb5/v8/iana/chksumtype"
 	ianaerrcode "github.com/jcmturner/gokrb5/v8/iana/errorcode"
 	ianaflags "github.com/jcmturner/gokrb5/v8/iana/flags"
 	"github.com/jcmturner/gokrb5/v8/keytab"
-
 	"github.com/jcmturner/gokrb5/v8/messages"
 	"github.com/jcmturner/gokrb5/v8/types"
 
-	"github.com/jake-scott/go-gssapi/v2"
+	"github.com/golang-auth/go-gssapi/v2"
 )
 
 func init() {
@@ -160,6 +162,69 @@ func (m Krb5Mech) IsEstablished() bool {
 // security requirements.
 func (m Krb5Mech) ContextFlags() (f gssapi.ContextFlag) {
 	return m.sessionFlags
+}
+
+// SSF returns the Security Strength Factor of the channel established
+// by the security context.  For Kerberos V, this depends on the type of
+// key being used to secure the channel.
+func (m Krb5Mech) SSF() uint {
+	var key types.EncryptionKey
+	switch {
+	case m.acceptorSubKey != nil:
+		key = *m.acceptorSubKey
+	case m.initiatorSubKey != nil:
+		key = *m.initiatorSubKey
+	default:
+		key = *m.sessionKey
+	}
+
+	return keySSF(key.KeyType)
+}
+
+// From MIT Kerberos 1.16 (src/lib/gssapi/krb5/wrap_size_limit.c)
+func (m Krb5Mech) WrapSizeLimit(requestedOutputSize uint32, confidentiality bool) uint32 {
+	var keyType int32
+	switch {
+	case m.acceptorSubKey != nil:
+		keyType = m.acceptorSubKey.KeyType
+	case m.initiatorSubKey != nil:
+		keyType = m.initiatorSubKey.KeyType
+	default:
+		keyType = m.sessionKey.KeyType
+	}
+
+	sz := requestedOutputSize
+
+	if confidentiality {
+		// try decreasing message lengths until the encrypted length including the
+		// header will fit the requested size
+		for sz > 0 {
+			wrapSize := 16 + encryptedLength(keyType, sz)
+			if wrapSize <= requestedOutputSize {
+				break
+			}
+
+			sz--
+		}
+
+		// account for the header
+		if sz > 16 {
+			sz -= 16
+		} else {
+			sz = 0
+		}
+	} else {
+		key, _ := crypto.GetEtype(keyType)
+		cksumSize := key.GetHMACBitLength() / 8
+
+		if sz < uint32(16+cksumSize) {
+			sz = 0
+		} else {
+			sz -= uint32(16 + cksumSize)
+		}
+	}
+
+	return sz
 }
 
 // Accept is used by a GSS-API Acceptor to begin context
@@ -833,4 +898,29 @@ func mkGssErrFromKrbErr(ke messages.KRBError) (token []byte, err error) {
 	}
 
 	return
+}
+
+// Generate a base key -- usually the same as GenerateEncryptionKey, except
+// that the gokrb5 library doesn't handle the hash/integrity and the encryption
+// keys being different lengths in aes256-cts-hmac-sha384-192
+// TODO: fix GenerateEncryptionKey at some point to cope with different
+// uses like this case.
+func GenerateBaseKey(etype etype.EType) (types.EncryptionKey, error) {
+	k := types.EncryptionKey{
+		KeyType: etype.GetETypeID(),
+	}
+
+	// special-case one encryption type
+	kl := etype.GetKeyByteSize()
+	if etype.GetETypeID() == etypeID.AES256_CTS_HMAC_SHA384_192 {
+		kl = 32
+	}
+
+	b := make([]byte, kl)
+	_, err := rand.Read(b)
+	if err != nil {
+		return k, err
+	}
+	k.KeyValue = b
+	return k, nil
 }

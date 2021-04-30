@@ -32,8 +32,17 @@ type Mech interface {
 	// requirements have been met.
 	ContextFlags() ContextFlag
 
-	// PeerName returns a string representingg the peer's identity
+	// PeerName returns a string representing the peer's identity
 	PeerName() string
+
+	// SSF returns the Security Strength Factor of the channel established
+	// by the security context
+	SSF() uint
+
+	// WrapSizeLimit returns the maximum possible message size that can
+	// be presented to Wrap() to produce to output token no longer than
+	// requestedOutputSize bytes
+	WrapSizeLimit(requestedOutputSize uint32, confidentiality bool) uint32
 
 	// Initiate is used by a GSS-API Initiator to start the
 	// context negotiation process with a remote Acceptor.

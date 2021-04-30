@@ -12,8 +12,8 @@ import (
 	"net"
 	"os"
 
-	"github.com/jake-scott/go-gssapi/v2"
-	_ "github.com/jake-scott/go-gssapi/v2/krb5"
+	"github.com/golang-auth/go-gssapi/v2"
+	_ "github.com/golang-auth/go-gssapi/v2/krb5"
 )
 
 var _debug bool

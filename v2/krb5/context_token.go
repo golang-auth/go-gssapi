@@ -20,7 +20,7 @@ import (
 	"github.com/jcmturner/gofork/encoding/asn1"
 	"github.com/jcmturner/gokrb5/v8/asn1tools"
 
-	"github.com/jake-scott/go-gssapi/v2"
+	"github.com/golang-auth/go-gssapi/v2"
 	"github.com/jcmturner/gokrb5/v8/messages"
 )
 

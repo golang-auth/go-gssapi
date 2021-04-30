@@ -1,15 +1,15 @@
 # go-gssapi: pure Go GSS-API implementation
 
 
-![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/jake-scott/go-gssapi)
-[![Git Workflow](https://img.shields.io/github/workflow/status/jake-scott/go-gssapi/unit-tests/v2)](https://img.shields.io/github/workflow/status/jake-scott/go-gssapi/unit-tests/v2)
+![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/golang-auth/go-gssapi)
+[![Git Workflow](https://img.shields.io/github/workflow/status/golang-auth/go-gssapi/unit-tests/v2)](https://img.shields.io/github/workflow/status/golang-auth/go-gssapi/unit-tests/v2)
 [![Go Version](https://img.shields.io/badge/go%20version-%3E=1.13-61CFDD.svg?style=flat-square)](https://golang.org/)
-[![PkgGoDev](https://pkg.go.dev/badge/mod/github.com/jake-scott/go-gssapi/v2)](https://pkg.go.dev/mod/github.com/jake-scott/go-gssapi/v2)
+[![PkgGoDev](https://pkg.go.dev/badge/mod/github.com/golang-auth/go-gssapi/v2)](https://pkg.go.dev/mod/github.com/golang-auth/go-gssapi/v2)
 
 
 go-gssapi is a pure Golang implementation of the GSS-API version 2 specification ([RFC 2743](https://tools.ietf.org/html/rfc2743)).  It uses the pure [Golang Kerberos implementation](https://github.com/jcmturner/gokrb5/tree/master/v8) to obtain Kerberos tickets and perform cryptographic operations.
 
-Documentation at https://pkg.go.dev/github.com/jake-scott/go-gssapi/v2
+Documentation at https://pkg.go.dev/github.com/golang-auth/go-gssapi/v2
 
 ## Implemented functionality
 
@@ -62,19 +62,19 @@ Import the base `go-gssapi` package where you will use GSS-API, and  the mechani
 ```go
   package myclient
   
-  import "github.com/jake-scott/go-gssapi/v2"
+  import "github.com/golang-auth/go-gssapi/v2"
 ```
 
 ```go
   package main
 
   //  register the Kerberos GSS-API mechsnism
-  import _ "github.com/jake-scott/go-gssapi/v2/krb5"
+  import _ "github.com/golang-auth/go-gssapi/v2/krb5"
 ```
 
 We will maintain major versions of the library in separate Git branches.  To use the latest version in a branch, use `go get` with the branch name, eg :
 
-     go get github.com/jake-scott/go-gssapi/v2@v2.0.0-alpha
+     go get github.com/golang-auth/go-gssapi/v2@v2.0.0-alpha
 
 This will result in a concrete version being added to `go.mod`:
 
@@ -83,7 +83,7 @@ module test
 
 go 1.15
 
-require github.com/jake-scott/go-gssapi/v2 v2.0.0-alpha //indirect
+require github.com/golang-auth/go-gssapi/v2 v2.0.0-alpha //indirect
 ```
 
 ## Initialization

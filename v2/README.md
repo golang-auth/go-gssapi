@@ -23,13 +23,14 @@ The following features are currently available:
  * Message Integrity and Confidentiality
  * GSS MIC and Wrap tokens
  * Basic support for detecting out-of-sequence and duplicate messages
+ * Channel binding (for initators)
 
 
 The following functionality is currently not available:
 
   * GSS-API v1 message tokens ([RFC1964](https://tools.ietf.org/html/rfc1964))
   * Delegation
-  * Channel binding
+  * Acceptor channel binding
 
 
 ## Platforms

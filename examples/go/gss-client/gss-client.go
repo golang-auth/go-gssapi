@@ -50,7 +50,7 @@ func main() {
 	if *mutual {
 		flags |= gssapi.ContextFlagMutual
 	}
-	if err := client.Initiate(service, flags); err != nil {
+	if err := client.Initiate(service, flags, nil); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

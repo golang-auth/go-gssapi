@@ -19,6 +19,8 @@ Wrap/Unwrap or MakeSignature/VerifySignature.
 */
 package gssapi
 
+import "github.com/golang-auth/go-gssapi/v2/common"
+
 // Mech defines the interface to a GSS-API mechanism
 type Mech interface {
 	// IsEstablished can be used to determine whether the security
@@ -49,7 +51,7 @@ type Mech interface {
 	// serverName is the mechanism specific name of the remote
 	// Acceptor, and flags represent the desired security
 	// properties of the context.
-	Initiate(serviceName string, flags ContextFlag) (err error)
+	Initiate(serviceName string, flags ContextFlag, cb *common.ChannelBinding) (err error)
 
 	// Accept is used by a GSS-API Acceptor to begin context
 	// negotiation with a remote Initiator.

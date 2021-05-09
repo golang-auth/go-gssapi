@@ -75,6 +75,7 @@ import (
 	"github.com/jcmturner/gokrb5/v8/types"
 
 	"github.com/golang-auth/go-gssapi/v2"
+	"github.com/golang-auth/go-gssapi/v2/common"
 )
 
 func init() {
@@ -125,6 +126,7 @@ type Krb5Mech struct {
 	isEstablished       bool
 	waitingForMutual    bool
 	service             string
+	channelBinding      *common.ChannelBinding
 	ticket              *messages.Ticket
 	sessionKey          *types.EncryptionKey
 	clientCTime         time.Time
@@ -257,6 +259,8 @@ func (m *Krb5Mech) Accept(serviceName string) (err error) {
 //
 // flags represent the desired security properties of the context
 //
+// cb is the channel binding data, or nil to disable
+//
 // It is highly recommended to make use of mutual authentication wherever
 // possible and to include replay detection:
 //
@@ -264,10 +268,11 @@ func (m *Krb5Mech) Accept(serviceName string) (err error) {
 //
 // Most users should also include gssapi.ContextFlagConf to enable the use
 // of message sealing.
-func (m *Krb5Mech) Initiate(serviceName string, requestFlags gssapi.ContextFlag) (err error) {
+func (m *Krb5Mech) Initiate(serviceName string, requestFlags gssapi.ContextFlag, cb *common.ChannelBinding) (err error) {
 	m.isEstablished = false
 	m.waitingForMutual = false
 	m.isInitiator = true
+	m.channelBinding = cb
 
 	// Obtain a Kerberos ticket for the service
 	if err = m.krbClientInit(serviceName); err != nil {
@@ -655,7 +660,7 @@ func (m *Krb5Mech) getAPReqMessage() (apreq messages.APReq, err error) {
 
 	auth.Cksum = types.Checksum{
 		CksumType: chksumtype.GSSAPI,
-		Checksum:  newAuthenticatorChksum(m.requestFlags),
+		Checksum:  newAuthenticatorChksum(m.requestFlags, m.channelBinding),
 	}
 
 	apreq, err = messages.NewAPReq(*m.ticket, *m.sessionKey, auth)

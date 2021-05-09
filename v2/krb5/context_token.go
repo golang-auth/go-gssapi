@@ -202,8 +202,6 @@ func cbChecksum(cb *common.ChannelBinding) []byte {
 	buf = append(buf, bufTmp[:]...)
 	buf = append(buf, cb.Data...)
 
-	fmt.Printf("Channel binding data (%d bytes):\n% x\n", len(buf), buf)
-
 	hashed := md5.Sum(buf)
 	return hashed[:]
 }

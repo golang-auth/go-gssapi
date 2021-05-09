@@ -102,7 +102,7 @@ then configure the context as an Initiator (client):
                                  gssapi.ContextFlagReplay |
                                  gssapi.ContextFlagSequence |
                                  gssapi.ContextFlagMutual
-  err := ctx.Initiate(service, flags)
+  err := ctx.Initiate(service, flags, nil)
 ```
 
 

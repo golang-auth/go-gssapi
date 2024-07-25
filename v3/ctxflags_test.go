@@ -25,5 +25,5 @@ func TestFlagString(t *testing.T) {
 	assert.Contains(t, str, "Delegation")
 	assert.Contains(t, str, "Mutual")
 	assert.Contains(t, str, "Confidentiality")
-	assert.NotContains(t, str, "sequence")
+	assert.NotContains(t, str, "Sequence")
 }

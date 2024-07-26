@@ -4,6 +4,8 @@ import (
 	"slices"
 )
 
+//go:generate  go run ./build-tools/gen-gss-name-oids.go -o names_gen.go
+
 // GssNameType defines the name types in a mech-independent fashion,
 // as described in RFC 2743 § 4
 type GssNameType int
@@ -33,56 +35,6 @@ const (
 	// No name type (RFC 2743 § 4.8),               Indicates that no name is being passed;  used only in gss_acquire_cred, gss_add_cred, gss_init_sec_context
 	GSS_NO_NAME
 )
-
-// order here needs to match the consts above!
-var nameTypes = []struct {
-	id        GssNameType
-	name      string
-	oidString string
-	oid       Oid
-	altOids   []Oid
-}{
-	// 1.2.840.113554.1.2.1.4
-	{GSS_NT_HOSTBASED_SERVICE,
-		"GSS_NT_HOSTBASED_SERVICE",
-		"1.2.840.113554.1.2.1.4",
-		[]byte{0x2a, 0x86, 0x48, 0x86, 0xf7, 0x12, 0x01, 0x02, 0x01, 0x04},
-		[]Oid{{0x2B, 0x06, 0x01, 0x05, 0x06, 0x02}}}, // 1.3.6.1.5.6.2                alternate value from RFC 2078
-
-	// 1.2.840.113554.1.2.1.1
-	{GSS_NT_USER_NAME,
-		"GSS_NT_USER_NAME",
-		"1.2.840.113554.1.2.1.1",
-		[]byte{0x2a, 0x86, 0x48, 0x86, 0xf7, 0x12, 0x01, 0x02, 0x01, 0x01}, []Oid{}},
-
-	// 1.2.840.113554.1.2.1.2
-	{GSS_NT_MACHINE_UID_NAME,
-		"GSS_NT_MACHINE_UID_NAME",
-		"1.2.840.113554.1.2.1.2",
-		[]byte{0x2a, 0x86, 0x48, 0x86, 0xf7, 0x12, 0x01, 0x02, 0x01, 0x02}, []Oid{}},
-
-	// 1.2.840.113554.1.2.1.3
-	{GSS_NT_STRING_UID_NAME,
-		"GSS_NT_STRING_UID_NAME",
-		"1.2.840.113554.1.2.1.3",
-		[]byte{0x2a, 0x86, 0x48, 0x86, 0xf7, 0x12, 0x01, 0x02, 0x01, 0x03}, []Oid{}},
-
-	// 1.3.6.1.5.6.3
-	{GSS_C_NT_ANONYMOUS,
-		"GSS_C_NT_ANONYMOUS",
-		"1.3.6.1.5.6.3",
-		[]byte{0x2b, 0x06, 0x01, 0x05, 0x06, 0x03}, []Oid{}},
-
-	{GSS_NO_OID, "GSS_NO_OID", "", nil, []Oid{}},
-
-	// 1.3.6.1.5.6.4
-	{GSS_EXPORT_NAME,
-		"GSS_EXPORT_NAME",
-		"1.3.6.1.5.6.4",
-		[]byte{0x2b, 0x06, 0x01, 0x05, 0x06, 0x04}, []Oid{}},
-
-	{GSS_NO_NAME, "GSS_NO_NAME", "", nil, []Oid{}},
-}
 
 func (nt GssNameType) Oid() Oid {
 	if nt > GSS_NO_NAME {

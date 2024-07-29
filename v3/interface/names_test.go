@@ -1,4 +1,4 @@
-package gssapi
+package gsscommon
 
 import (
 	"testing"
@@ -54,25 +54,25 @@ func TestNtString(t *testing.T) {
 	assert.PanicsWithValue(ErrBadNameType, func() { badNt.String() })
 }
 
-func TestFromOid(t *testing.T) {
+func TestNameFromOid(t *testing.T) {
 	assert := assert.New(t)
 
 	// from a good primary OID
-	nt, err := FromOid(Oid{0x2a, 0x86, 0x48, 0x86, 0xf7, 0x12, 0x01, 0x02, 0x01, 0x01})
+	nt, err := NameFromOid(Oid{0x2a, 0x86, 0x48, 0x86, 0xf7, 0x12, 0x01, 0x02, 0x01, 0x01})
 	assert.NoError(err)
 	assert.Equal(GSS_NT_USER_NAME, nt)
 
 	// from a secondary OID
-	nt, err = FromOid(Oid{0x2B, 0x06, 0x01, 0x05, 0x06, 0x02})
+	nt, err = NameFromOid(Oid{0x2B, 0x06, 0x01, 0x05, 0x06, 0x02})
 	assert.NoError(err)
 	assert.Equal(GSS_NT_HOSTBASED_SERVICE, nt)
 
 	// from a bad oid
-	_, err = FromOid(Oid{0x00})
+	_, err = NameFromOid(Oid{0x00})
 	assert.ErrorIs(err, ErrBadNameType)
 
 	// from a nil oid
-	nt, err = FromOid(nil)
+	nt, err = NameFromOid(nil)
 	assert.NoError(err)
 	assert.Equal(GSS_NO_OID, nt)
 }

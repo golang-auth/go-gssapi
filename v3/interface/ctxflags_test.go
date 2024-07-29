@@ -1,4 +1,4 @@
-package gssapi
+package gsscommon
 
 import (
 	"testing"

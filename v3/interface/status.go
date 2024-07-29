@@ -1,4 +1,4 @@
-package gssapi
+package gsscommon
 
 import (
 	"errors"
@@ -7,7 +7,7 @@ import (
 
 type InfoStatus struct {
 	InformationCode InformationCode
-	MechErrorCode   MechErrorCode
+	MechErrors      []error
 }
 
 type FatalStatus struct {
@@ -19,7 +19,6 @@ type FatalStatus struct {
 // See RFC 2744 § 3.9.1
 type FatalErrorCode uint32
 type InformationCode uint32
-type MechErrorCode uint32
 
 const (
 	complete FatalErrorCode = iota
@@ -162,7 +161,7 @@ func (s InfoStatus) Error() string {
 		infoStrings[i] = err.Error()
 	}
 
-	ret += strings.Join(infoStrings, ", ")
+	ret += strings.Join(infoStrings, "; ")
 
 	return ret
 }
@@ -180,16 +179,29 @@ func (s FatalStatus) Unwrap() []error {
 }
 
 func (s FatalStatus) Error() string {
-	var ret string
+	var parts []string
 
 	if s.FatalErrorCode != complete {
-		ret = s.Fatal().Error()
+		fatal := s.Fatal()
+		// only include the spiel about maybe the minor code being helpful if we do
+		// actually have a mech error (from the minor code)
+		if !(fatal == ErrFailure && len(s.MechErrors) > 0) {
+			parts = append(parts, fatal.Error())
+		}
+	}
+
+	if s.MechErrors != nil {
+		mechStrs := make([]string, len(s.MechErrors))
+		for i, e := range s.MechErrors {
+			mechStrs[i] = e.Error()
+		}
+		parts = append(parts, strings.Join(mechStrs, "; "))
 	}
 
 	infoErrs := s.InfoStatus.Error()
 	if infoErrs != "" {
-		ret += ". Additionally: " + infoErrs
+		parts = append(parts, "Additionally: "+infoErrs)
 	}
 
-	return ret
+	return strings.Join(parts, ".  ")
 }

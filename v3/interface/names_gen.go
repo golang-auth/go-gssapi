@@ -1,4 +1,4 @@
-package gssapi
+package gsscommon
 
 // GENERATED CODE: DO NOT EDIT
 
@@ -42,8 +42,8 @@ var nameTypes = []struct {
 		[]Oid{ }},
 
 	// 1.3.6.1.5.6.3
-	{ GSS_C_NT_ANONYMOUS,
-		"GSS_C_NT_ANONYMOUS",
+	{ GSS_NT_ANONYMOUS,
+		"GSS_NT_ANONYMOUS",
 		"1.3.6.1.5.6.3",
 		[]byte{ 0x2b, 0x6, 0x1, 0x5, 0x6, 0x3 },
 		[]Oid{ }},
@@ -56,8 +56,8 @@ var nameTypes = []struct {
 		[]Oid{ }},
 
 	// 1.3.6.1.5.6.4
-	{ GSS_EXPORT_NAME,
-		"GSS_EXPORT_NAME",
+	{ GSS_NT_EXPORT_NAME,
+		"GSS_NT_EXPORT_NAME",
 		"1.3.6.1.5.6.4",
 		[]byte{ 0x2b, 0x6, 0x1, 0x5, 0x6, 0x4 },
 		[]Oid{ }},
@@ -67,6 +67,29 @@ var nameTypes = []struct {
 		"GSS_NO_NAME",
 		"",
 		nil,
+		[]Oid{ }},
+
+	// 1.2.840.113554.1.2.2.1
+	{ GSS_KRB5_NT_PRINCIPAL_NAME,
+		"GSS_KRB5_NT_PRINCIPAL_NAME",
+		"1.2.840.113554.1.2.2.1",
+		[]byte{ 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x12, 0x1, 0x2, 0x2, 0x1 },
+		[]Oid{
+		   {0x2a, 0x86, 0x48, 0x82, 0xf7, 0x12, 0x1, 0x2, 0x2 }, // 1.2.840.48018.1.2.2
+		  }},
+
+	// 1.2.840.113554.1.2.2.6
+	{ GSS_KRB5_NT_ENTERPRISE_NAME,
+		"GSS_KRB5_NT_ENTERPRISE_NAME",
+		"1.2.840.113554.1.2.2.6",
+		[]byte{ 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x12, 0x1, 0x2, 0x2, 0x6 },
+		[]Oid{ }},
+
+	// 1.2.840.113554.1.2.2.7
+	{ GSS_KRB5_NT_X509_CERT,
+		"GSS_KRB5_NT_X509_CERT",
+		"1.2.840.113554.1.2.2.7",
+		[]byte{ 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x12, 0x1, 0x2, 0x2, 0x7 },
 		[]Oid{ }},
 
 }

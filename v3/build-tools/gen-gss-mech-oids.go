@@ -16,26 +16,21 @@ var namesToOids = []struct {
 	oid     string
 	altOids []string
 }{
-	{"GSS_NT_HOSTBASED_SERVICE", "1.2.840.113554.1.2.1.4", []string{"1.3.6.1.5.6.2"}},
-	{"GSS_NT_USER_NAME", "1.2.840.113554.1.2.1.1", []string{}},
-	{"GSS_NT_MACHINE_UID_NAME", "1.2.840.113554.1.2.1.2", []string{}},
-	{"GSS_NT_STRING_UID_NAME", "1.2.840.113554.1.2.1.3", []string{}},
-	{"GSS_NT_ANONYMOUS", "1.3.6.1.5.6.3", []string{}},
-	{"GSS_NO_OID", "", []string{}},
-	{"GSS_NT_EXPORT_NAME", "1.3.6.1.5.6.4", []string{}},
-	{"GSS_NO_NAME", "", []string{}},
-	{"GSS_KRB5_NT_PRINCIPAL_NAME", "1.2.840.113554.1.2.2.1", []string{"1.2.840.48018.1.2.2"}},
-	{"GSS_KRB5_NT_ENTERPRISE_NAME", "1.2.840.113554.1.2.2.6", []string{}},
-	{"GSS_KRB5_NT_X509_CERT", "1.2.840.113554.1.2.2.7", []string{}},
+
+	// the alternate OIDs are the old (pre RFC) OID and incorrect OID shipped with Windows 2000
+	// (see https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-spng/211417c4-11ef-46c0-a8fb-f178a51c2088)
+	{"GSS_MECH_KRB5", "1.2.840.113554.1.2.2", []string{"1.3.6.1.5.2", "1.2.840.48018.1.2.2"}},
+	{"GSS_MECH_IAKERB", "1.3.6.1.5.2.5", []string{}},
+	{"GSS_MECH_SPNEGO", "1.3.6.1.5.5.2", []string{}},
 }
 
 var codeTemplate = `package gsscommon
 
 // GENERATED CODE: DO NOT EDIT
 
-var nameTypes = []struct {
-	id        GssNameType
-	name      string
+var mechs = []struct {
+	id        GssMech
+	mech      string
 	oidString string
 	oid       Oid
 	altOids   []Oid

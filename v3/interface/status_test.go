@@ -1,4 +1,4 @@
-package gssapi
+package gsscommon
 
 import (
 	"errors"
@@ -41,7 +41,7 @@ func TestFatalUnwrap(t *testing.T) {
 	assert.ErrorAs(err, &FatalStatus{})
 }
 
-func TestFatelError(t *testing.T) {
+func TestFatalError(t *testing.T) {
 	assert := assert.New(t)
 
 	var err error = FatalStatus{

@@ -37,7 +37,10 @@ fmt:
 
 
 .PHONY: generate
-generate: names_gen.go
+generate: interface/names_gen.go interface/mechs_gen.go
 
-names_gen.go: build-tools/gen-gss-name-oids.go names.go
-	go generate names.go
+interface/names_gen.go: build-tools/gen-gss-name-oids.go interface/names.go
+	go generate interface/names.go
+
+interface/mechs_gen.go: build-tools/gen-gss-mech-oids.go interface/mechs.go
+	go generate interface/mechs.go

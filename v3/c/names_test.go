@@ -161,14 +161,15 @@ func writeKrb5Confs() (f1, f2 string, err error) {
 
 func TestCanonicalizeName(t *testing.T) {
 	assert := assert.New(t)
+	vars := newSaveVars("KRB5_CONFIG")
+	defer vars.Restore()
+
 	lib := New()
 
 	f1, f2, err := writeKrb5Confs()
 	assert.NoError(err)
 	defer os.Remove(f1)
 	defer os.Remove(f2)
-
-	saved := os.Getenv("KRB5_CONFIG")
 
 	name1, err := lib.ImportName("foo", g.GSS_NT_USER_NAME)
 	assert.NoError(err)
@@ -185,19 +186,19 @@ func TestCanonicalizeName(t *testing.T) {
 	_, err = name1.Canonicalize(g.GSS_MECH_KRB5)
 	assert.Error(err)
 	assert.Contains(err.Error(), "does not specify default realm")
-
-	os.Setenv("KRB5_CONFIG", saved)
 }
 
 func TestExportName(t *testing.T) {
 	assert := assert.New(t)
+	vars := newSaveVars("KRB5_CONFIG")
+	defer vars.Restore()
+
 	lib := New()
 
 	f1, f2, err := writeKrb5Confs()
 	assert.NoError(err)
 	defer os.Remove(f1)
 	defer os.Remove(f2)
-	saved := os.Getenv("KRB5_CONFIG")
 	os.Setenv("KRB5_CONFIG", f1)
 
 	name1, err := lib.ImportName("fooname", g.GSS_NT_USER_NAME)
@@ -215,7 +216,6 @@ func TestExportName(t *testing.T) {
 	assert.NoError(err)
 	assert.NotEmpty(exp)
 
-	os.Setenv("KRB5_CONFIG", saved)
 }
 
 func TestDuplicateName(t *testing.T) {

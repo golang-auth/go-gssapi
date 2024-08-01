@@ -41,5 +41,5 @@ func NewLibrary(name string) Library {
 
 type Library interface {
 	ImportName(name string, nameType GssNameType) (GssName, error)
-	AcquireCredential(name GssName, lifetime time.Duration, mechs []GssMech, usage CredUsage) (Credential, error)
+	AcquireCredential(name GssName, mechs []GssMech, usage CredUsage, lifetime time.Duration) (Credential, *CredInfo, error)
 }

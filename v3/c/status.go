@@ -2,12 +2,20 @@ package gssapi
 
 import (
 	"errors"
+	"fmt"
 
 	g "github.com/golang-auth/go-gssapi/v3/interface"
 )
 
 /*
 #include <gssapi.h>
+
+gss_OID_desc GoStringToGssOID(_GoString_ s);
+
+OM_uint32 display_status(OM_uint32 status, int status_type, _GoString_ mechOid, OM_uint32 *minor, OM_uint32 *msgCtx, gss_buffer_desc *status_string) {
+	gss_OID_desc oid = GoStringToGssOID(mechOid);
+	return gss_display_status(minor, status, status_type, &oid, msgCtx, status_string);
+}
 */
 import "C"
 
@@ -78,6 +86,7 @@ func makeMechStatus(major, minor C.OM_uint32, mech g.GssMech) error {
 		return nil
 	}
 
+	// see RFC 2744 § 3.9.1
 	calling_error := (major & 0xFF000000) >> 24 // bad call by us to gssapi
 	routine_error := (major & 0x00FF0000) >> 16 // the "Fatal" errors
 	supplementary := major & 0xffff
@@ -87,7 +96,9 @@ func makeMechStatus(major, minor C.OM_uint32, mech g.GssMech) error {
 		InformationCode: g.InformationCode(supplementary),
 	}
 
-	// minor codes are specific to the mech
+	// minor codes are specific to the mech; there are no standard codes
+	// so we just deposit error objects with description strings from
+	// the C API
 	if minor != 0 {
 		minorErrors := gssMinorErrors(minor, mech)
 		if len(minorErrors) > 0 {
@@ -114,4 +125,35 @@ func makeMechStatus(major, minor C.OM_uint32, mech g.GssMech) error {
 		CallingErrorCode: CallingErrorCode(calling_error),
 		FatalStatus:      fatal,
 	}
+}
+
+// Ask GSSAPI for the error strings associated a the minor (mech specific)
+// error code
+func gssMinorErrors(minor C.OM_uint32, mech g.GssMech) []error {
+	mechOid := mech.Oid()
+	var lMinor, msgCtx C.OM_uint32
+	var statusString C.gss_buffer_desc
+
+	ret := []error{}
+
+	for {
+		major := C.display_status(minor, 2, string(mechOid), &lMinor, &msgCtx, &statusString)
+		if major != 0 {
+			// specifically do not call makeStatus here - we might end up in a loop..
+			ret = append(ret, fmt.Errorf("got GSS error %d/%d while finding string for minor code %d", major, lMinor, minor))
+			break
+		}
+
+		defer C.gss_release_buffer(&lMinor, &statusString)
+
+		s := C.GoStringN((*C.char)(statusString.value), C.int(statusString.length))
+		ret = append(ret, errors.New(s))
+
+		// all done when the message context is set to zero by gss_display_status
+		if msgCtx == 0 {
+			break
+		}
+	}
+
+	return ret
 }

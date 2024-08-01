@@ -6,33 +6,25 @@ import "time"
 
 type CredUsage int
 
+// Cred usage values as defined at RFC 2743 § 2.1.1
 const (
 	CredUsageInitiateAndAccept CredUsage = iota
 	CredUsageInitiateOnly
-	CreUsageAcceptOnly
+	CredUsageAcceptOnly
 )
 
-type InquireCredByMechResult struct {
-	Name             string
-	LifetimeInitiate time.Duration
-	LifetimeAccept   time.Duration
-	Usage            CredUsage
+type CredInfo struct {
+	Name            string
+	NameType        GssNameType
+	InitiatorExpiry *time.Time // nil: not supported
+	AcceptorExpiry  *time.Time // nil: not supported
+	Usage           CredUsage
+	Mechs           []GssMech
 }
 
 type Credential interface {
-	// // Release can return nil, ErrNoCred or ErrFailure
-	// Release() error
-
-	// // Inquire can return nil, ErrNoCred, ErrDefectiveCredential, ErrCredentialsExpired or ErrFailure
-	// Inquire(name string, lifetime time.Duration, mechs []Oid, usage CredUsage)
-
-	// // Add can return nil, ErrDuplicateElement, ErrBadMech, ErrBadNameType, ErrBadName, ErrNoCred, ErrCredentialsExpired or ErrFailure
-	// Add(name string, initiatorTime time.Duration, acceptorTime time.Duration, mech Oid, usage CredUsage) error
-
-	// // InquireByMech can return nil, ErrNoCred, ErrDefectiveCredential, ErrCredentialsExpired, ErrBadMech, ErrFailure
-	// InquireByMech(mech Oid) (*InquireCredByMechResult, error)
-
-	// // in place of actual_mechs and lifetime_rec outputs from Gss_Acquite_cred (RFC2743 § 2.1.1)
-	// Mech() Oid
-	// TimeRemaining() time.Duration
+	Release() error                                                                                                                      // RFC 2743 § 2.1.2
+	Inquire() (*CredInfo, error)                                                                                                         // RFC 2743 § 2.1.3
+	Add(name GssName, mech GssMech, usage CredUsage, initiatorLifetime time.Duration, acceptorLifetime time.Duration) (*CredInfo, error) // RFC 2743 § 2.1.4
+	InquireByMech(mech GssMech) (*CredInfo, error)                                                                                       // RFC 2743 § 2.1.5
 }

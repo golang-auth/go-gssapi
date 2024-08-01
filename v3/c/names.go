@@ -3,19 +3,8 @@ package gssapi
 /*
 #include <gssapi.h>
 
-gss_OID_desc GoStringToGssOID(_GoString_ s) {
-	size_t l = _GoStringLen(s);
-	void *elms = (void*)_GoStringPtr(s);
-	gss_OID_desc oid = {l, elms};
-	return oid;
-}
-
-gss_buffer_desc GoStringToGssBuffer(_GoString_ s) {
-	size_t l = _GoStringLen(s);
-	void *value = (void*)_GoStringPtr(s);
-	gss_buffer_desc buf = {l, value};
-	return buf;
-}
+gss_OID_desc GoStringToGssOID(_GoString_ s);
+gss_buffer_desc GoStringToGssBuffer(_GoString_ s);
 
 // _GoString_ is really a convenient []byte here..
 OM_uint32 import_name(_GoString_ name, _GoString_ nameOid, OM_uint32 *minor, gss_name_t *output_name) {
@@ -32,10 +21,6 @@ OM_uint32 canonicalize_name(const gss_name_t name, _GoString_ mechOid, OM_uint32
 	return gss_canonicalize_name(minor, name, &oid, output_name);
 }
 
-OM_uint32 display_status(OM_uint32 status, int status_type, _GoString_ mechOid, OM_uint32 *minor, OM_uint32 *msgCtx, gss_buffer_desc *status_string) {
-	gss_OID_desc oid = GoStringToGssOID(mechOid);
-	return gss_display_status(minor, status, status_type, &oid, msgCtx, status_string);
-}
 
 */
 // #cgo LDFLAGS: -lgssapi_krb5
@@ -44,7 +29,6 @@ import "C"
 import (
 	"errors"
 	"fmt"
-	"unsafe"
 
 	g "github.com/golang-auth/go-gssapi/v3/interface"
 )
@@ -53,18 +37,22 @@ type GssName struct {
 	name C.gss_name_t
 }
 
-func (_ library) ImportName(name string, nameType g.GssNameType) (g.GssName, error) {
+func nameFromGssInternal(name C.gss_name_t) GssName {
+	return GssName{name}
+}
+
+func (library) ImportName(name string, nameType g.GssNameType) (g.GssName, error) {
 	nameOid := nameType.Oid()
 	var minor C.OM_uint32
-	var gssName C.gss_name_t
-	major := C.import_name(name, string(nameOid), &minor, &gssName)
+	var cGssName C.gss_name_t
+	major := C.import_name(name, string(nameOid), &minor, &cGssName)
 
 	if major != 0 {
 		return nil, makeStatus(major, minor)
 	}
 
 	return &GssName{
-		name: gssName,
+		name: cGssName,
 	}, nil
 }
 
@@ -77,14 +65,14 @@ func (n *GssName) Compare(other g.GssName) (bool, error) {
 	}
 
 	var minor C.OM_uint32
-	var equal C.int
-	major := C.gss_compare_name(&minor, n.name, otherName.name, &equal)
+	var cEqual C.int
+	major := C.gss_compare_name(&minor, n.name, otherName.name, &cEqual)
 	if major != 0 {
 		return false, makeStatus(major, minor)
 	}
 
 	t := false
-	if equal != 0 {
+	if cEqual != 0 {
 		t = true
 	}
 	return t, nil
@@ -92,18 +80,19 @@ func (n *GssName) Compare(other g.GssName) (bool, error) {
 
 func (n *GssName) Display() (string, g.GssNameType, error) {
 	var minor C.OM_uint32
-	var outputBuf C.gss_buffer_desc
-	var outType C.gss_OID // not to be freed..
-	major := C.gss_display_name(&minor, n.name, &outputBuf, &outType)
+	var cOutputBuf C.gss_buffer_desc // outputBuf.value allocated by GSSAPI; released by *1
+	var cOutType C.gss_OID           // not to be freed (static GSSAPI data)
+	major := C.gss_display_name(&minor, n.name, &cOutputBuf, &cOutType)
 	if major != 0 {
 		return "", g.GSS_NO_OID, makeStatus(major, minor)
 	}
 
-	defer C.gss_release_buffer(&minor, &outputBuf)
+	// *1 release GSSAPI allocated buffer
+	defer C.gss_release_buffer(&minor, &cOutputBuf)
 
-	name := C.GoBytes(outputBuf.value, C.int(outputBuf.length))
+	name := C.GoBytes(cOutputBuf.value, C.int(cOutputBuf.length))
 
-	oid := C.GoBytes(outType.elements, C.int(outType.length))
+	oid := C.GoBytes(cOutType.elements, C.int(cOutType.length))
 	nameType, err := g.NameFromOid(oid)
 	if err != nil {
 		return "", g.GSS_NO_OID, makeStatus(major, minor)
@@ -124,23 +113,20 @@ func (n *GssName) Release() error {
 
 func (n *GssName) InquireMechs() ([]g.GssMech, error) {
 	var minor C.OM_uint32
-	var cMechSet C.gss_OID_set
+	var cMechSet C.gss_OID_set // cMechSet.elements allocated by GSSAPI; released by *1
 	major := C.gss_inquire_mechs_for_name(&minor, n.name, &cMechSet)
 	if major != 0 {
 		return nil, makeStatus(major, minor)
 	}
 
+	// *1   release GSSAPI allocated array
 	defer C.gss_release_oid_set(&minor, &cMechSet)
 
-	// make a Go slice backed by the C array..
-	var oidArray *C.gss_OID_desc = cMechSet.elements
-	mechSlice := unsafe.Slice(oidArray, cMechSet.count)
+	ret := make([]g.GssMech, 0, cMechSet.count)
+	mechOids := oidsFromGssOidSet(cMechSet)
 
-	ret := make([]g.GssMech, 0, len(mechSlice))
-	for _, cOid := range mechSlice {
-		goMechOid := C.GoBytes(cOid.elements, C.int(cOid.length))
-
-		mech, err := g.MechFromOid(goMechOid)
+	for _, oid := range mechOids {
+		mech, err := g.MechFromOid(oid)
 		switch {
 		default:
 			ret = append(ret, mech)
@@ -158,71 +144,42 @@ func (n *GssName) InquireMechs() ([]g.GssMech, error) {
 func (n *GssName) Canonicalize(mech g.GssMech) (g.GssName, error) {
 	mechOid := mech.Oid()
 	var minor C.OM_uint32
-	var outName C.gss_name_t
-	major := C.canonicalize_name(n.name, string(mechOid), &minor, &outName)
+	var cOutName C.gss_name_t
+	major := C.canonicalize_name(n.name, string(mechOid), &minor, &cOutName)
 	if major != 0 {
 		return nil, makeMechStatus(major, minor, mech)
 	}
 
 	return &GssName{
-		name: outName,
+		name: cOutName,
 	}, nil
 }
 
 func (n *GssName) Export() ([]byte, error) {
 	var minor C.OM_uint32
-	var outputBuf C.gss_buffer_desc
-	major := C.gss_export_name(&minor, n.name, &outputBuf)
+	var cOutputBuf C.gss_buffer_desc // cOutputBuf.value allocated by GSSAPI; released by *1
+	major := C.gss_export_name(&minor, n.name, &cOutputBuf)
 	if major != 0 {
 		return nil, makeStatus(major, minor)
 	}
 
-	defer C.gss_release_buffer(&minor, &outputBuf)
+	// *1  release GSSAPI allocated buffer
+	defer C.gss_release_buffer(&minor, &cOutputBuf)
 
-	exported := C.GoBytes(outputBuf.value, C.int(outputBuf.length))
+	exported := C.GoBytes(cOutputBuf.value, C.int(cOutputBuf.length))
 
 	return exported, nil
 }
 
 func (n *GssName) Duplicate() (g.GssName, error) {
 	var minor C.OM_uint32
-	var name C.gss_name_t
-	major := C.gss_duplicate_name(&minor, n.name, &name)
+	var cOutName C.gss_name_t
+	major := C.gss_duplicate_name(&minor, n.name, &cOutName)
 	if major != 0 {
 		return nil, makeStatus(major, minor)
 	}
 
 	return &GssName{
-		name: name,
+		name: cOutName,
 	}, nil
-}
-
-// Ask GSSAPI for the error string associated a the minor (mech specific)
-// error code
-func gssMinorErrors(minor C.OM_uint32, mech g.GssMech) []error {
-	mechOid := mech.Oid()
-	var lMinor, msgCtx C.OM_uint32
-	var statusString C.gss_buffer_desc
-
-	ret := []error{}
-
-	for {
-		major := C.display_status(minor, 2, string(mechOid), &lMinor, &msgCtx, &statusString)
-		if major != 0 {
-			ret = append(ret, fmt.Errorf("got GSS major code %d while finding string for minor code %d", major, minor))
-			break
-		}
-
-		defer C.gss_release_buffer(&lMinor, &statusString)
-
-		s := C.GoStringN((*C.char)(statusString.value), C.int(statusString.length))
-		ret = append(ret, errors.New(s))
-
-		// all done when the message context is set to zero by gss_display_status
-		if msgCtx == 0 {
-			break
-		}
-	}
-
-	return ret
 }

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	//_ "github.com/golang-auth/go-gssapi/v3/c"
+	_ "github.com/golang-auth/go-gssapi/v3/c"
 
 	gssapi "github.com/golang-auth/go-gssapi/v3/interface"
 )

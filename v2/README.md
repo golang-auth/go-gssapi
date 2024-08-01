@@ -75,7 +75,7 @@ Import the base `go-gssapi` package where you will use GSS-API, and  the mechani
 
 We will maintain major versions of the library in separate Git branches.  To use the latest version in a branch, use `go get` with the branch name, eg :
 
-     go get github.com/golang-auth/go-gssapi/v2@v2.0.0-alpha
+     go get github.com/golang-auth/go-gssapi/v2
 
 This will result in a concrete version being added to `go.mod`:
 
@@ -84,7 +84,7 @@ module test
 
 go 1.15
 
-require github.com/golang-auth/go-gssapi/v2 v2.0.0-alpha //indirect
+require github.com/golang-auth/go-gssapi/v2 v2.2.2 // indirect
 ```
 
 ## Initialization

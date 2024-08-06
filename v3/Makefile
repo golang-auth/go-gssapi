@@ -37,10 +37,13 @@ fmt:
 
 
 .PHONY: generate
-generate: interface/names_gen.go interface/mechs_gen.go
+generate: interface/names_gen.go interface/mechs_gen.go c/testvecs_test.go
 
 interface/names_gen.go: build-tools/gen-gss-name-oids.go interface/names.go
 	go generate interface/names.go
 
 interface/mechs_gen.go: build-tools/gen-gss-mech-oids.go interface/mechs.go
 	go generate interface/mechs.go
+
+c/testvecs_test.go: build-tools/mk-test-vectors
+	go generate c/common_test.go

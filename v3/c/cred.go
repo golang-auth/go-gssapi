@@ -2,7 +2,6 @@ package gssapi
 
 /*
 #include <gssapi.h>
-#include <stdio.h>
 
 gss_OID_desc GoStringToGssOID(_GoString_ s);
 
@@ -37,7 +36,7 @@ type Credential struct {
 	id C.gss_cred_id_t
 }
 
-func (library) AcquireCredential(name g.GssName, mechs []g.GssMech, usage g.CredUsage, lifetime time.Duration) (g.Credential, *g.CredInfo, error) {
+func (library) AcquireCredential(name g.GssName, mechs []g.GssMech, usage g.CredUsage, lifetime time.Duration) (g.Credential, error) {
 	// turn the mechs into an array of OIDs
 	gssOidSet := gssOidSetFromOids(mechsToOids(mechs))
 	gssOidSet.Pin()
@@ -45,73 +44,27 @@ func (library) AcquireCredential(name g.GssName, mechs []g.GssMech, usage g.Cred
 
 	var cGssName C.gss_name_t
 	if name != nil {
-		cName, ok := name.(*GssName)
+		lName, ok := name.(*GssName)
 		if !ok {
-			return nil, nil, fmt.Errorf("bad name type %T, %w", name, g.ErrBadName)
+			return nil, fmt.Errorf("bad name type %T, %w", name, g.ErrBadName)
 		}
 
-		cGssName = cName.name
+		cGssName = lName.name
 	}
 
 	var minor C.OM_uint32
 	var cCredId C.gss_cred_id_t
-	var cActualMechs C.gss_OID_set // cActualMechs.elements allocated by GSSAPI; released by *1
-	var cTimeRec C.OM_uint32
-	major := C.gss_acquire_cred(&minor, cGssName, C.OM_uint32(lifetime.Seconds()), gssOidSet.oidSet, C.int(usage), &cCredId, &cActualMechs, &cTimeRec)
+	major := C.gss_acquire_cred(&minor, cGssName, C.OM_uint32(lifetime.Seconds()), gssOidSet.oidSet, C.int(usage), &cCredId, nil, nil)
 
 	if major != 0 {
-		return nil, nil, makeStatus(major, minor)
+		return nil, makeStatus(major, minor)
 	}
-
-	// *1  release GSSAPI allocated array
-	defer C.gss_release_oid_set(&minor, &cActualMechs)
 
 	cred := &Credential{
 		id: cCredId,
 	}
-	info := &g.CredInfo{
-		Usage: usage,
-	}
 
-	if name != nil {
-		var err error
-		info.Name, info.NameType, err = name.Display()
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-
-	// we might get a validity period back from GSSAPI, though we don't actually know whether that
-	// is for the acceptor or the initiator if we asked for a credential for both
-	if cTimeRec != C.GSS_C_INDEFINITE {
-		t := time.Now().Add(time.Second * time.Duration(cTimeRec)).Round(time.Second)
-		switch usage {
-		default:
-			info.AcceptorExpiry = &t
-			info.InitiatorExpiry = &t
-		case g.CredUsageAcceptOnly:
-			info.AcceptorExpiry = &t
-		case g.CredUsageInitiateOnly:
-			info.InitiatorExpiry = &t
-		}
-	}
-
-	actualMechOids := oidsFromGssOidSet(cActualMechs)
-	for _, oid := range actualMechOids {
-		mech, err := g.MechFromOid(oid)
-		switch {
-		default:
-			info.Mechs = append(info.Mechs, mech)
-		case errors.Is(err, g.ErrBadMech):
-			// warn
-			continue
-		case err != nil:
-			return nil, nil, err
-		}
-
-	}
-
-	return cred, info, nil
+	return cred, nil
 }
 
 func (c *Credential) Release() error {
@@ -236,17 +189,17 @@ func (c *Credential) InquireByMech(mech g.GssMech) (*g.CredInfo, error) {
 	return ret, nil
 }
 
-func (c *Credential) Add(name g.GssName, mech g.GssMech, usage g.CredUsage, initiatorLifetime time.Duration, acceptorLifetime time.Duration) (*g.CredInfo, error) {
+func (c *Credential) Add(name g.GssName, mech g.GssMech, usage g.CredUsage, initiatorLifetime time.Duration, acceptorLifetime time.Duration) error {
 	mechOid := mech.Oid()
 
 	var cGssName C.gss_name_t
 	if name != nil {
-		cName, ok := name.(*GssName)
+		lName, ok := name.(*GssName)
 		if !ok {
-			return nil, fmt.Errorf("bad name type %T, %w", name, g.ErrBadName)
+			return fmt.Errorf("bad name type %T, %w", name, g.ErrBadName)
 		}
 
-		cGssName = cName.name
+		cGssName = lName.name
 	}
 
 	var minor C.OM_uint32
@@ -254,48 +207,8 @@ func (c *Credential) Add(name g.GssName, mech g.GssMech, usage g.CredUsage, init
 	var cActualMechs C.gss_OID_set // cActualMechs.elements allocated by GSSAPI; released by *1
 	major := C.add_cred(&minor, c.id, cGssName, string(mechOid), C.int(usage), C.OM_uint32(initiatorLifetime.Seconds()), C.OM_uint32(acceptorLifetime.Seconds()), &cActualMechs, &cTimeRecInit, &cTimeRecAcc)
 	if major != 0 {
-		return nil, makeMechStatus(major, minor, mech)
+		return makeMechStatus(major, minor, mech)
 	}
 
-	info := &g.CredInfo{
-		Usage: usage,
-	}
-	if name != nil {
-		var err error
-		info.Name, info.NameType, err = name.Display()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	actualMechOids := oidsFromGssOidSet(cActualMechs)
-	for _, oid := range actualMechOids {
-		mech, err := g.MechFromOid(oid)
-		switch {
-		default:
-			info.Mechs = append(info.Mechs, mech)
-		case errors.Is(err, g.ErrBadMech):
-			// warn
-			continue
-		case err != nil:
-			return nil, err
-		}
-	}
-
-	if cTimeRecInit != C.GSS_C_INDEFINITE {
-		var t time.Time
-		if cTimeRecInit != 0 {
-			t = time.Now().Add(time.Second * time.Duration(cTimeRecInit)).Round(time.Second)
-		}
-		info.InitiatorExpiry = &t
-	}
-	if cTimeRecAcc != C.GSS_C_INDEFINITE {
-		var t time.Time
-		if cTimeRecAcc != 0 {
-			t = time.Now().Add(time.Second * time.Duration(cTimeRecAcc)).Round(time.Second)
-		}
-		info.AcceptorExpiry = &t
-	}
-
-	return info, nil
+	return nil
 }

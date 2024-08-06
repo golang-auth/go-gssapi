@@ -4,7 +4,7 @@ import "strings"
 
 type ContextFlag uint32
 
-// GSS-API context flags assigned numbers.
+// GSS-API context flags - the same as C bindings for compatibility
 const (
 	ContextFlagDeleg    ContextFlag = 1 << iota // delegate credentials, not currently supported
 	ContextFlagMutual                           // request remote peer authenticates itself
@@ -12,6 +12,7 @@ const (
 	ContextFlagSequence                         // enable detection of out of sequence signed/sealed messages
 	ContextFlagConf                             // confidentiality available
 	ContextFlagInteg                            // integrity available
+	ContextFlagAnon                             // do not transfer initiator identity to acceptor
 )
 
 // FlagList returns a slice of individual flags derived from the
@@ -44,6 +45,8 @@ func FlagName(f ContextFlag) string {
 		return "Confidentiality"
 	case ContextFlagInteg:
 		return "Integrity"
+	case ContextFlagAnon:
+		return "Anonymous"
 	}
 
 	return "Unknown"

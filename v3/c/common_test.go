@@ -2,6 +2,8 @@ package gssapi
 
 import "os"
 
+//go:generate  ../build-tools/mk-test-vectors -o testvecs_test.go
+
 type saveVars struct {
 	vars map[string]string
 }

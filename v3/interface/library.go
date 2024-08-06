@@ -40,6 +40,8 @@ func NewLibrary(name string) Library {
 }
 
 type Library interface {
-	ImportName(name string, nameType GssNameType) (GssName, error)
-	AcquireCredential(name GssName, mechs []GssMech, usage CredUsage, lifetime time.Duration) (Credential, *CredInfo, error)
+	ImportName(name string, nameType GssNameType) (GssName, error)                                                                     // RFC 2743 § 2.4.5
+	AcquireCredential(name GssName, mechs []GssMech, usage CredUsage, lifetime time.Duration) (Credential, error)                      // RFC 2743 § 2.1.1
+	InitSecContext(cred Credential, name GssName, mech GssMech, flags ContextFlag, lifetime time.Duration) (SecContext, []byte, error) // RFC 2743 § 2.2.1
+	AcceptSecContext(cred Credential, inputToken []byte) (SecContext, *SecContextInfo, []byte, error)                                  // RFC 2743 § 2.2.2
 }

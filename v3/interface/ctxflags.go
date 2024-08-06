@@ -4,7 +4,7 @@ import "strings"
 
 type ContextFlag uint32
 
-// GSS-API context flags - the same as C bindings for compatibility
+// GSS-API request context flags - the same as C bindings for compatibility
 const (
 	ContextFlagDeleg    ContextFlag = 1 << iota // delegate credentials, not currently supported
 	ContextFlagMutual                           // request remote peer authenticates itself

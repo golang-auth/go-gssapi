@@ -39,6 +39,10 @@ func oidsFromGssOidSet(oidSet C.gss_OID_set) []g.Oid {
 	return ret
 }
 
+func oidFromGssOid(cOid C.gss_OID) g.Oid {
+	return C.GoBytes(cOid.elements, C.int(cOid.length))
+}
+
 func gssOidSetFromOids(oids []g.Oid) gssOidSet {
 	ret := gssOidSet{}
 
@@ -79,4 +83,16 @@ func mechsToOids(mechs []g.GssMech) []g.Oid {
 	}
 
 	return ret
+}
+
+func bytesToCBuffer(b []byte) (C.gss_buffer_desc, runtime.Pinner) {
+	ret := C.gss_buffer_desc{
+		length: C.size_t(len(b)),
+		value:  unsafe.Pointer(&b[0]),
+	}
+
+	pinner := runtime.Pinner{}
+	pinner.Pin(&b[0])
+
+	return ret, pinner
 }

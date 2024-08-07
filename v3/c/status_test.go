@@ -18,7 +18,7 @@ func TestConstValues(t *testing.T) {
 func TestCallingUnwrap(t *testing.T) {
 	assert := assert.New(t)
 
-	var err error = CallingError{
+	var err error = FatalCallingError{
 		CallingErrorCode: inaccessibleRead,
 		FatalStatus: g.FatalStatus{
 			FatalErrorCode: 2,
@@ -34,13 +34,13 @@ func TestCallingUnwrap(t *testing.T) {
 	assert.ErrorIs(err, g.InfoGapToken)
 	assert.NotErrorIs(err, g.InfoOldToken)
 
-	assert.ErrorAs(err, &CallingError{})
+	assert.ErrorAs(err, &FatalCallingError{})
 }
 
 func TestCallingError(t *testing.T) {
 	assert := assert.New(t)
 
-	var err error = CallingError{
+	var err error = FatalCallingError{
 		CallingErrorCode: inaccessibleRead,
 		FatalStatus: g.FatalStatus{
 			FatalErrorCode: 1,

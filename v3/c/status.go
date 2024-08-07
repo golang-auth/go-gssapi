@@ -19,7 +19,7 @@ OM_uint32 display_status(OM_uint32 status, int status_type, _GoString_ mechOid, 
 */
 import "C"
 
-type CallingError struct {
+type FatalCallingError struct {
 	g.FatalStatus
 	CallingErrorCode CallingErrorCode
 }
@@ -37,7 +37,7 @@ var ErrInaccessibleRead = errors.New("a required input parameter could not be re
 var ErrInaccessibleWrite = errors.New("a required output parameter could not be written")
 var ErrBadStructure = errors.New("a parameter was malformed")
 
-func (s CallingError) Calling() error {
+func (s FatalCallingError) Calling() error {
 	switch s.CallingErrorCode {
 	default:
 		return g.ErrBadStatus
@@ -50,7 +50,7 @@ func (s CallingError) Calling() error {
 	}
 }
 
-func (s CallingError) Unwrap() []error {
+func (s FatalCallingError) Unwrap() []error {
 	ret := []error{}
 
 	if s.CallingErrorCode != 0 {
@@ -62,7 +62,7 @@ func (s CallingError) Unwrap() []error {
 	return ret
 }
 
-func (s CallingError) Error() string {
+func (s FatalCallingError) Error() string {
 	var ret string
 
 	if s.CallingErrorCode != 0 {
@@ -106,11 +106,13 @@ func makeMechStatus(major, minor C.OM_uint32, mech g.GssMech) error {
 		}
 	}
 
-	if routine_error == 0 {
-		return info
+	if routine_error == 0 && calling_error == 0 {
+		if calling_error == 0 {
+			return info
+		}
 	}
 
-	// some are also fatal
+	// some are also fatal (always if there is a calling error)
 	fatal := g.FatalStatus{
 		FatalErrorCode: g.FatalErrorCode(routine_error),
 		InfoStatus:     info,
@@ -121,7 +123,7 @@ func makeMechStatus(major, minor C.OM_uint32, mech g.GssMech) error {
 	}
 
 	// and then some are calling errors also, in the C bindings at least
-	return CallingError{
+	return FatalCallingError{
 		CallingErrorCode: CallingErrorCode(calling_error),
 		FatalStatus:      fatal,
 	}

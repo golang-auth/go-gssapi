@@ -86,13 +86,17 @@ func mechsToOids(mechs []g.GssMech) []g.Oid {
 }
 
 func bytesToCBuffer(b []byte) (C.gss_buffer_desc, runtime.Pinner) {
+	pinner := runtime.Pinner{}
+
+	value := unsafe.Pointer(nil)
+	if len(b) > 0 {
+		value = unsafe.Pointer(&b[0])
+		pinner.Pin(&b[0])
+	}
 	ret := C.gss_buffer_desc{
 		length: C.size_t(len(b)),
-		value:  unsafe.Pointer(&b[0]),
+		value:  value,
 	}
-
-	pinner := runtime.Pinner{}
-	pinner.Pin(&b[0])
 
 	return ret, pinner
 }

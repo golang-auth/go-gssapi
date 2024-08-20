@@ -1,0 +1,26 @@
+#!/bin/bash
+
+TMPDIR=$(mktemp -d)
+
+cleanup() {
+    rm -rf "${TMPDIR}"
+}
+
+trap cleanup EXIT
+
+
+find . -name \*.go -type f \! -name \*_gen.go \
+  | xargs gofmt -l -d
+  
+  #  >${TMPDIR}/fmt.out
+
+# if [ -s ${TMPDIR}/fmt.out ];
+# then
+#   echo "The following files are not formatted correctly:"
+#   cat ${TMPDIR}/fmt.out
+#   exit 1
+# fi
+
+# echo "gofmt-output=gofmt step successful"
+# exit 0
+

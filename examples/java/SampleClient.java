@@ -70,8 +70,7 @@ public class SampleClient {
         // Obtain the command-line arguments and parse the port number
 
         if (args.length < 3) {
-            System.err.println("Usage: java <options> Login SampleClient "
-                               + " <server> <hostName> <port>");
+            System.err.println("Usage: java <options> SampleClient <server> <hostName> <port>");
             System.exit(-1);
         }
 

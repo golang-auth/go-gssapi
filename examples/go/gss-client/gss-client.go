@@ -1,33 +1,41 @@
-// Copyright 2021 Jake Scott. All rights reserved.
-// Use of this source code is governed by the Apache License
-// version 2.0 that can be found in the LICENSE file.
-
+// SPDX-License-Identifier: Apache-2.0
 package main
 
 import (
 	"bytes"
+	"encoding/asn1"
 	"encoding/binary"
+	"encoding/hex"
 	"flag"
 	"fmt"
+	"log"
 	"net"
 	"os"
+	"strconv"
+	"strings"
+	"time"
 
-	"github.com/golang-auth/go-gssapi/v2"
-	_ "github.com/golang-auth/go-gssapi/v2/krb5"
+	_ "github.com/golang-auth/go-gssapi-c"
+	"github.com/golang-auth/go-gssapi/v3"
 )
 
 var _debug bool
 
+var provider string = "GSSAPI-C"
+var gss = gssapi.NewProvider(provider)
+
 func main() {
 	port := flag.Int("port", 1234, "remote port to connect to")
+	mech := flag.String("mech", "", "use specific mech OID")
+	deleg := flag.Bool("d", false, "request delegation")
+	file := flag.Bool("f", false, "use file")
+	confReq := flag.Bool("seal", false, "seal (encrypt) the message")
 	mutual := flag.Bool("mutual", false, "request mutual authentication")
-	seal := flag.Bool("seal", false, "seal (encrypt) the message")
-	flag.BoolVar(&_debug, "d", false, "enable debugging")
+	flag.BoolVar(&_debug, "debug", false, "enable debugging")
 	flag.Parse()
 
 	if flag.NArg() != 3 {
-		fmt.Fprintf(os.Stderr, "Usage: %s [-port <int>] [-mutual] [-seal] [-d] host service msg\n", os.Args[0])
-		os.Exit(1)
+		log.Fatalf("Usage: %s [-port <int>] [-mech <OID>] [-d] [-f] [-seal] [-mutual] [-debug] host service msg\n", os.Args[0])
 	}
 
 	host := flag.Arg(0)
@@ -38,82 +46,180 @@ func main() {
 	addr := fmt.Sprintf("%s:%d", host, *port)
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 
 	debug("Connected to %s", addr)
 
-	client := gssapi.NewMech("kerberos_v5")
-
-	var flags gssapi.ContextFlag = gssapi.ContextFlagInteg | gssapi.ContextFlagConf | gssapi.ContextFlagReplay | gssapi.ContextFlagSequence
+	var flags gssapi.ContextFlag
 	if *mutual {
 		flags |= gssapi.ContextFlagMutual
 	}
-	if err := client.Initiate(service, flags, nil); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+	if *deleg {
+		flags |= gssapi.ContextFlagDeleg
 	}
 
-	var inToken, outToken []byte
-
-	for !client.IsEstablished() {
-		outToken, err = client.Continue(inToken)
+	opts := []gssapi.InitSecContextOption{
+		gssapi.WithInitiatorFlags(flags),
+	}
+	if *mech != "" {
+		oid, err := parseOid(*mech)
 		if err != nil {
-			break
+			log.Fatal(err)
 		}
+		gssMech, err := gssapi.MechFromOid(oid)
+		if err != nil {
+			log.Fatal(err)
+		}
+		opts = append(opts, gssapi.WithInitatorMech(gssMech))
+	}
+
+	serviceName, err := gss.ImportName(service, gssapi.GSS_NT_HOSTBASED_SERVICE)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer serviceName.Release()
+
+	debug("Requested flags: %s", flags)
+
+	secctx, outToken, err := gss.InitSecContext(serviceName, opts...)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer secctx.Delete()
+
+	if sendErr := sendToken(conn, outToken); sendErr != nil {
+		log.Fatal(err)
+	}
+	debug("Sent context token (%d bytes):", len(outToken))
+	debug("%s", formatToken(outToken))
+
+	for secctx.ContinueNeeded() {
+
+		inToken, err := recvToken(conn)
+		if err != nil {
+			log.Fatal(err)
+		}
+		debug("Read context token (%d bytes:", len(inToken))
+		debug("%s", formatToken(inToken))
+
+		outToken, err = secctx.Continue(inToken)
 
 		if len(outToken) > 0 {
-			if sendErr := sendToken(conn, outToken); sendErr != nil {
-				err = sendErr
-				break
+			if err := sendToken(conn, outToken); err != nil {
+				log.Fatal(err)
 			}
+			debug("Sent context token (%d bytes):", len(outToken))
+			debug("%s", formatToken(outToken))
+
 		}
 
-		if !client.IsEstablished() {
-			inToken, err = recvToken(conn)
-			if err != nil {
-				break
-			}
+		if err != nil {
+			log.Fatal(err)
 		}
 	}
 
+	info, err := secctx.Inquire()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		log.Fatal(err)
+	}
+	printContextInfo(info)
+
+	ntypes, err := gss.InquireNamesForMech(info.Mech)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	debug("Context established, sever: %s", client.PeerName())
-	gotFlags := gssapi.FlagList(client.ContextFlags())
-	for _, f := range gotFlags {
-		debug("  context flag: 0x%02x: %s", f, gssapi.FlagName(f))
+	debug("Name types supported by mech:")
+	for _, nt := range ntypes {
+		debug("  %-30s (%s)", nt, nt.OidString())
+	}
+
+	var msgBuf []byte
+	if *file {
+		msgBuf, err = os.ReadFile(msg)
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		msgBuf = []byte(msg)
 	}
 
 	// Wrap the message
-	outToken, err = client.Wrap([]byte(msg), *seal)
+	outMsg, hasConf, err := secctx.Wrap(msgBuf, *confReq)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	if err = sendToken(conn, outToken); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 
-	// Receive a MIC token from the server
-	inToken, err = recvToken(conn)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+	if !hasConf {
+		debug("Warning!  Message not encrypted.")
 	}
 
-	if err = client.VerifySignature([]byte(msg), inToken); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+	if err = sendToken(conn, outMsg); err != nil {
+		log.Fatal(err)
+	}
+	debug("Sent wrap message (%d bytes):\n%s", len(outMsg), formatToken(outMsg))
+
+	// Receive a wrapped token from the server
+	msgMIC, err := recvToken(conn)
+	if err != nil {
+		log.Fatal(err)
+	}
+	debug("Received MIC message (%d bytes):\n%s", len(msgMIC), formatToken(msgMIC))
+
+	if err = secctx.VerifyMIC(msgBuf, msgMIC); err != nil {
+		log.Fatal(err)
 	}
 
 	fmt.Println("Successfully verified message signature (MIC) from server")
 
+}
+
+func printContextInfo(info *gssapi.SecContextInfo) {
+	local := "remotely initiated"
+	open := "closed"
+
+	if info.LocallyInitiated {
+		local = "locally initiated"
+	}
+	if info.FullyEstablished {
+		open = "open"
+	}
+
+	debug("Context flags: %s", info.Flags)
+	debug("\"%s\" to \"%s\", expires: %s, %s, %s",
+		info.InitiatorName, info.AcceptorName,
+		info.ExpiresAt.Round(time.Second),
+		local,
+		open)
+
+	debug("Name type of source is %s (%s)", info.AcceptorNameType, info.AcceptorNameType.OidString())
+	debug("Name type of destination is %s (%s)", info.InitiatorNameType, info.InitiatorNameType.OidString())
+	debug("Mechanism: %s (%s)", info.Mech, info.Mech.OidString())
+}
+
+func parseOid(s string) (gssapi.Oid, error) {
+	// split string into components
+	elms := strings.Split(s, ".")
+
+	oid := make(asn1.ObjectIdentifier, len(elms))
+
+	for i, elm := range elms {
+		j, err := strconv.ParseUint(elm, 10, 32)
+		if err != nil {
+			return nil, fmt.Errorf("non-number in OID: %w", err)
+		}
+
+		oid[i] = int(j)
+	}
+
+	enc, err := asn1.Marshal(oid)
+	if err != nil {
+		return nil, fmt.Errorf("parsing OID: %w", err)
+	}
+
+	return enc[2:], nil
 }
 
 func sendToken(conn net.Conn, token []byte) error {
@@ -124,14 +230,22 @@ func sendToken(conn net.Conn, token []byte) error {
 		return err
 	}
 
-	n, err := conn.Write(token)
+	_, err = conn.Write(token)
 	if err != nil {
 		return err
 	}
-	debug("Wrote %d bytes to server", n)
-	debug("Token bytes: [% x]", token)
 
 	return nil
+}
+
+func formatToken(tok []byte) string {
+	b := &strings.Builder{}
+
+	bd := hex.Dumper(b)
+	defer bd.Close()
+
+	bd.Write(tok)
+	return b.String()
 }
 
 func recvToken(conn net.Conn) (token []byte, err error) {
@@ -146,12 +260,10 @@ func recvToken(conn net.Conn) (token []byte, err error) {
 	binary.Read(buf, binary.BigEndian, &tokenSize)
 
 	token = make([]byte, tokenSize)
-	n, err := conn.Read(token)
+	_, err = conn.Read(token)
 	if err != nil {
 		return
 	}
-	debug("Read %d byte token from server", n)
-	debug("Token bytes: [% x]", token)
 
 	return
 }

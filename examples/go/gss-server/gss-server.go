@@ -1,27 +1,31 @@
-// Copyright 2021 Jake Scott. All rights reserved.
-// Use of this source code is governed by the Apache License
-// version 2.0 that can be found in the LICENSE file.
-
+// SPDX-License-Identifier: Apache-2.0
 package main
 
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"os"
+	"strings"
+	"time"
 
-	"github.com/golang-auth/go-gssapi/v2"
-	_ "github.com/golang-auth/go-gssapi/v2/krb5"
+	_ "github.com/golang-auth/go-gssapi-c"
+	"github.com/golang-auth/go-gssapi/v3"
 )
 
 var _debug bool
 
+var provider string = "GSSAPI-C"
+var gss = gssapi.NewProvider(provider)
+
 func main() {
 	port := flag.Int("port", 1234, "local port to listen on")
-	flag.BoolVar(&_debug, "d", false, "enable debugging")
+	flag.BoolVar(&_debug, "debug", false, "enable debugging")
 	flag.Parse()
 
 	// Listen on port
@@ -51,14 +55,22 @@ func sendToken(conn net.Conn, token []byte) error {
 		return err
 	}
 
-	n, err := conn.Write(token)
+	_, err = conn.Write(token)
 	if err != nil {
 		return err
 	}
-	debug("Wrote %d bytes to client", n)
-	debug("Token bytes: [% x]", token)
 
 	return nil
+}
+
+func formatToken(tok []byte) string {
+	b := &strings.Builder{}
+
+	bd := hex.Dumper(b)
+	defer bd.Close()
+
+	bd.Write(tok)
+	return b.String()
 }
 
 func recvToken(conn net.Conn) (token []byte, err error) {
@@ -67,19 +79,16 @@ func recvToken(conn net.Conn) (token []byte, err error) {
 	if err != nil {
 		return
 	}
-	debug("Expecting 0x% x byte token from client", szBuff)
 
 	buf := bytes.NewBuffer(szBuff)
 	var tokenSize uint32
 	binary.Read(buf, binary.BigEndian, &tokenSize)
 
 	token = make([]byte, tokenSize)
-	n, err := io.ReadFull(conn, token)
+	_, err = io.ReadFull(conn, token)
 	if err != nil {
 		return
 	}
-	debug("Read %d byte token from client", n)
-	debug("Token bytes: [% x]", token)
 
 	return
 }
@@ -92,69 +101,115 @@ func debug(format string, args ...interface{}) {
 	fmt.Printf(format+"\n", args...)
 }
 
-func handleConn(conn net.Conn) {
+func handleConn(conn net.Conn) error {
 	defer conn.Close()
 
 	debug("Accepted connection from %s", conn.RemoteAddr())
 
-	server := gssapi.NewMech("kerberos_v5")
-	err := server.Accept("")
+	inToken, err := recvToken(conn)
+	if err != nil {
+		return showErr(err)
+	}
+	debug("Read context token (%d bytes:", len(inToken))
+	debug("%s", formatToken(inToken))
 
-	var inToken, outToken []byte
+	secctx, outToken, err := gss.AcceptSecContext(nil, inToken)
+	if err != nil {
+		return showErr(err)
+	}
 
-	for !server.IsEstablished() {
-		inToken, err = recvToken(conn)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			break
+	defer secctx.Delete()
+
+	if len(outToken) > 0 {
+		if err := sendToken(conn, outToken); err != nil {
+			return showErr(err)
 		}
+		debug("Sent context token (%d bytes):", len(outToken))
+		debug("%s", formatToken(outToken))
+	}
 
-		outToken, err = server.Continue(inToken)
+	for secctx.ContinueNeeded() {
+		if inToken, err = recvToken(conn); err != nil {
+			return showErr(err)
+		}
+		debug("Read context token (%d bytes:", len(inToken))
+		debug("%s", formatToken(inToken))
+
+		outToken, err = secctx.Continue(inToken)
+
 		if len(outToken) > 0 {
-			if sendErr := sendToken(conn, outToken); sendErr != nil {
-				err = sendErr
-				break
+			if err := sendToken(conn, outToken); err != nil {
+				return showErr(err)
 			}
+			debug("Sent context token (%d bytes):", len(outToken))
+			debug("%s", formatToken(outToken))
+		}
+
+		if err != nil {
+			log.Fatal(err)
 		}
 	}
 
+	info, err := secctx.Inquire()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return
+		return showErr(err)
 	}
+	printContextInfo(info)
 
-	debug("Context established, client: %s", server.PeerName())
-	flags := gssapi.FlagList(server.ContextFlags())
-	for _, f := range flags {
-		debug("  context flag: 0x%02x: %s", f, gssapi.FlagName(f))
-	}
-
-	inToken, err = recvToken(conn)
+	inMsg, err := recvToken(conn)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return
+		return showErr(err)
 	}
+	debug("Received wrap message (%d bytes):\n%s", len(inMsg), formatToken(inMsg))
 
-	msg, isSealed, err := server.Unwrap(inToken)
+	origMsg, conf, err := secctx.Unwrap(inMsg)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return
+		return showErr(err)
 	}
 
 	protStr := "signed"
-	if isSealed {
+	if conf {
 		protStr = "sealed"
 	}
-	fmt.Printf(`Received %s message: "%s"`+"\n", protStr, msg)
+	fmt.Printf(`Received %s message: "%s"`+"\n", protStr, origMsg)
 
 	// generate a MIC token to send back
-	if outToken, err = server.MakeSignature(msg); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return
+	if outToken, err = secctx.GetMIC(origMsg); err != nil {
+		return showErr(err)
 	}
 
 	if err = sendToken(conn, outToken); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return
+		return showErr(err)
 	}
+	debug("Sent MIC message (%d bytes):\n%s", len(outToken), formatToken(outToken))
+
+	return nil
+}
+
+func showErr(err error) error {
+	log.Printf("ERROR: %s", err)
+	return err
+}
+
+func printContextInfo(info *gssapi.SecContextInfo) {
+	local := "remotely initiated"
+	open := "closed"
+
+	if info.LocallyInitiated {
+		local = "locally initiated"
+	}
+	if info.FullyEstablished {
+		open = "open"
+	}
+
+	debug("Context flags: %s", info.Flags)
+	debug("\"%s\" to \"%s\", expires: %s, %s, %s",
+		info.InitiatorName, info.AcceptorName,
+		info.ExpiresAt.Round(time.Second),
+		local,
+		open)
+
+	debug("Name type of source is %s (%s)", info.AcceptorNameType, info.AcceptorNameType.OidString())
+	debug("Name type of destination is %s (%s)", info.InitiatorNameType, info.InitiatorNameType.OidString())
+	debug("Mechanism: %s (%s)", info.Mech, info.Mech.OidString())
 }

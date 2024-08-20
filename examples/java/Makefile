@@ -9,4 +9,8 @@ all: $(BINS)
 
 .PHONY: run-client
 run-client:
-	java -Djavax.security.auth.useSubjectCredsOnly=false -DKRB5CCNAME=/tmp/krb5cc_1000 -Dsun.security.krb5.debug=true -Djava.security.krb5.conf=/etc/krb5.conf -Djava.security.auth.login.config=./jaas.conf  SampleClient ldap/wellard.poptart.org localhost 1234 
+	java -Dsun.security.krb5.debug=true   -Djavax.security.auth.useSubjectCredsOnly=false -Djava.security.krb5.conf=../testvectors/krb5.conf -Djava.security.auth.login.config=./jaas.conf   SampleClient rack@foo.golang-auth.io  localhost 1234
+
+.PHONY: run-server
+run-server:
+	java -Dsun.security.krb5.debug=true   -Djavax.security.auth.useSubjectCredsOnly=false -Djava.security.krb5.conf=../testvectors/krb5.conf -Djava.security.auth.login.config=./jaas.conf   SampleServer 1234

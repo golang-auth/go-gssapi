@@ -1,0 +1,57 @@
+name: Checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+    
+jobs:
+
+  consistency-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+  
+      - name: Set up Go 1.22
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.22.x
+
+      - name: Code format check
+        run: ./.github/scripts/gofmt
+
+      - uses: dominikh/staticcheck-action@v1.3.1
+        with:
+          working-directory: v3
+
+  basic-tests:
+    name: Basic tests
+    strategy:
+      matrix:
+#        os: ['windows-latest', 'ubuntu-latest']
+        os: ['ubuntu-latest']
+        go-version: ['1.21.x', '1.22.x' ]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go ${{ matrix.go-version }}
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+
+    - name: Generate test includes
+      run: |
+        echo pkgs=$(cd v3 && go list ./... | grep -v /examples/) >> "$GITHUB_ENV"
+
+    - name: Run tests
+      run: cd v3 && go test $pkgs -count 100 -coverprofile=../cover.out -covermode=atomic
+
+    - name: Check test coverage
+      uses: vladopajic/go-test-coverage@v2
+      with:
+        config: ./.testcoverage.yml

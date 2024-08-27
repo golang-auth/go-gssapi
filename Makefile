@@ -29,7 +29,7 @@ $(src_dir)/mechs_gen.go: build-tools/gen-gss-mech-oids.go $(src_dir)/mechs.go
 .PHONY: test
 test:
 	cd $(src_dir) && ../scripts/gofmt
-	${GO} test ./... -coverprofile=./cover.out -covermode=atomic
+	cd $(src_dir) && ${GO} test ./... -coverprofile=./cover.out -covermode=atomic
 
 
 .PHONY: lint

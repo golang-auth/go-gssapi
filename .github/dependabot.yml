@@ -1,0 +1,8 @@
+version: 2
+updates:
+- package-ecosystem: github-actions
+  directory: /v3
+  schedule:
+    interval: weekly
+  target-branch: "staging"
+  open-pull-requests-limit: 5

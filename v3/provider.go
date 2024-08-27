@@ -40,6 +40,8 @@ func NewProvider(name string) Provider {
 	return f()
 }
 
+type QoP uint
+
 type InitSecContextOptions struct {
 	Credential Credential
 	Mech       GssMech

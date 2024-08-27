@@ -20,7 +20,7 @@ func TestNtOid(t *testing.T) {
 	assert.Equal(Oid{0x2a, 0x86, 0x48, 0x86, 0xf7, 0x12, 0x01, 0x02, 0x01, 0x01}, oid)
 
 	badNt := GssNameType(100)
-	assert.PanicsWithValue(ErrBadNameType, func() { badNt.Oid() })
+	assert.PanicsWithValue(ErrBadNameType, func() { _ = badNt.Oid() })
 }
 
 func TestNtOidString(t *testing.T) {
@@ -36,7 +36,7 @@ func TestNtOidString(t *testing.T) {
 	assert.Equal("1.2.840.113554.1.2.1.1", oid)
 
 	badNt := GssNameType(100)
-	assert.PanicsWithValue(ErrBadNameType, func() { badNt.OidString() })
+	assert.PanicsWithValue(ErrBadNameType, func() { _ = badNt.OidString() })
 }
 
 func TestNtString(t *testing.T) {
@@ -52,7 +52,7 @@ func TestNtString(t *testing.T) {
 	assert.Equal("GSS_NT_USER_NAME", oid)
 
 	badNt := GssNameType(100)
-	assert.PanicsWithValue(ErrBadNameType, func() { badNt.String() })
+	assert.PanicsWithValue(ErrBadNameType, func() { _ = badNt.String() })
 }
 
 func TestNameFromOid(t *testing.T) {

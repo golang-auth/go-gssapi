@@ -21,3 +21,5 @@ examples/go/gss-server-go
 # Dependency directories (remove the comment below to include it)
 # vendor/
 #
+#
+toolbin/

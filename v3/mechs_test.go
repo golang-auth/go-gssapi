@@ -35,7 +35,7 @@ func TestMechString(t *testing.T) {
 	assert.Equal("GSS_MECH_SPNEGO", oid)
 
 	badMech := gssMechImpl(100)
-	assert.PanicsWithValue(ErrBadMech, func() { badMech.OidString() })
+	assert.PanicsWithValue(ErrBadMech, func() { badMech.String() })
 }
 
 func TestMechFromOid(t *testing.T) {

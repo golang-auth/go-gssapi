@@ -23,3 +23,5 @@ examples/go/gss-server-go
 #
 #
 toolbin/
+
+v3/cover.out

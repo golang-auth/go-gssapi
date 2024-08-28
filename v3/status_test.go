@@ -24,6 +24,40 @@ func TestConstValues(t *testing.T) {
 	assert.Equal(InformationCode(16), infoGapToken)
 }
 
+func TestFatal(t *testing.T) {
+	assert := assert.New(t)
+
+	tests := []struct {
+		code        FatalErrorCode
+		errContains string
+	}{
+		{errBadMech, "unsupported mech"},
+		{errBadName, "invalid name"},
+		{errBadNameType, "unsupported type"},
+		{errBadBindings, "channel bindings"},
+		{errBadStatus, "invalid status"},
+		{errBadMic, "invalid signature"},
+		{errNoCred, "no credentials"},
+		{errNoContext, "no context"},
+		{errDefectiveToken, "invalid token"},
+		{errDefectiveCredential, "invalid credential"},
+		{errCredentialsExpired, "credentials have expired"},
+		{errContextExpired, "context has expired"},
+		{errFailure, "unspecified GSS"},
+		{errBadQop, "quality-of-protection"},
+		{errUnauthorized, "operation is forbidden"},
+		{errUnavailable, "not available"},
+		{errDuplicateElement, "already exists"},
+		{errNameNotMn, "not mechanism"},
+		{1000, "invalid status"},
+	}
+
+	for _, tt := range tests {
+		fs := FatalStatus{FatalErrorCode: tt.code}
+		assert.Contains(fs.Fatal().Error(), tt.errContains)
+	}
+}
+
 func TestFatalUnwrap(t *testing.T) {
 	assert := assert.New(t)
 
@@ -49,6 +83,7 @@ func TestFatalError(t *testing.T) {
 		FatalErrorCode: errBadMech,
 		InfoStatus: InfoStatus{
 			InformationCode: infoDuplicateToken | infoGapToken,
+			MechErrors:      []error{errors.New("TEST")},
 		},
 	}
 

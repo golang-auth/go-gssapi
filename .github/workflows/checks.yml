@@ -49,9 +49,9 @@ jobs:
         echo pkgs=$(cd v3 && go list ./... | grep -v /examples/) >> "$GITHUB_ENV"
 
     - name: Run tests
-      run: cd v3 && go test $pkgs -count 100 -coverprofile=../cover.out -covermode=atomic
+      run: pushd v3 ; go test -v $pkgs -count 100 -coverprofile=../cover.out -covermode=atomic; popd
 
     - name: Check test coverage
-      uses: vladopajic/go-test-coverage@v2
+      uses: jake-scott/go-test-coverage@v1.0.0
       with:
         config: ./.testcoverage.yml

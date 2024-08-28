@@ -34,7 +34,7 @@ const (
 	errDefectiveToken
 	errDefectiveCredential
 	errCredentialsExpired
-	errContexctExpired
+	errContextExpired
 	errFailure
 	errBadQop
 	errUnauthorized
@@ -71,7 +71,7 @@ var ErrBadQop = errors.New("the quality-of-protection (QOP) requested could not 
 var ErrUnauthorized = errors.New("the operation is forbidden by local security policy")
 var ErrUnavailable = errors.New("the operation or option is not available or supported")
 var ErrDuplicateElement = errors.New("the requested credential element already exists")
-var ErrNameNotMn = errors.New("the provided name was not mechsnism specific (MN)")
+var ErrNameNotMn = errors.New("the provided name was not mechanism specific (MN)")
 
 //lint:ignore ST1012 these aren't actually errors
 var InfoContinueNeeded = errors.New("the routine must be called again to complete its function")
@@ -114,7 +114,7 @@ func (s FatalStatus) Fatal() error {
 		return ErrDefectiveCredential
 	case errCredentialsExpired:
 		return ErrCredentialsExpired
-	case errContexctExpired:
+	case errContextExpired:
 		return ErrContextExpired
 	case errFailure:
 		return ErrFailure

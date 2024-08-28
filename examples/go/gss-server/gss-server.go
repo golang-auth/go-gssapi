@@ -162,7 +162,7 @@ func handleConn(conn net.Conn) error {
 	}
 	debug("Received wrap message (%d bytes):\n%s", len(inMsg), formatToken(inMsg))
 
-	origMsg, conf, err := secctx.Unwrap(inMsg)
+	origMsg, conf, _, err := secctx.Unwrap(inMsg)
 	if err != nil {
 		return showErr(err)
 	}
@@ -174,7 +174,7 @@ func handleConn(conn net.Conn) error {
 	fmt.Printf(`Received %s message: "%s"`+"\n", protStr, origMsg)
 
 	// generate a MIC token to send back
-	if outToken, err = secctx.GetMIC(origMsg); err != nil {
+	if outToken, err = secctx.GetMIC(origMsg, 0); err != nil {
 		return showErr(err)
 	}
 

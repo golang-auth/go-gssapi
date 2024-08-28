@@ -147,7 +147,7 @@ func main() {
 	}
 
 	// Wrap the message
-	outMsg, hasConf, err := secctx.Wrap(msgBuf, *confReq)
+	outMsg, hasConf, err := secctx.Wrap(msgBuf, *confReq, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -168,7 +168,7 @@ func main() {
 	}
 	debug("Received MIC message (%d bytes):\n%s", len(msgMIC), formatToken(msgMIC))
 
-	if err = secctx.VerifyMIC(msgBuf, msgMIC); err != nil {
+	if _, err = secctx.VerifyMIC(msgBuf, msgMIC); err != nil {
 		log.Fatal(err)
 	}
 

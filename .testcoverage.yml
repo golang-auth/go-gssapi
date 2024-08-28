@@ -6,22 +6,23 @@
 # profiles into one. In this case, the profile should have a comma-separated list 
 # of profile files, e.g., 'cover_unit.out,cover_integration.out'.
 profile: cover.out
+working-directory: v3
 
 # (optional; but recommended to set) 
 # When specified reported file paths will not contain local prefix in the output
-local-prefix: "github.com/jake-scott/go-functional"
+local-prefix: "github.com/golang-auth/go-gssapi/v3"
 
 # Holds coverage thresholds percentages, values should be in range [0-100]
 threshold:
   # (optional; default 0) 
   # The minimum coverage that each file should have
-  file: 75
+  file: 60
 
   # (optional; default 0) 
   # The minimum coverage that each package should have
-  package: 85
+  package: 70
 
   # (optional; default 0) 
   # The minimum total coverage project should have
-  total: 95
+  total: 85
 

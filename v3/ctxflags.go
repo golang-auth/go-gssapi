@@ -14,6 +14,14 @@ const (
 	ContextFlagConf                             // confidentiality available
 	ContextFlagInteg                            // integrity available
 	ContextFlagAnon                             // do not transfer initiator identity to acceptor
+
+	// extensions
+	ContextFlagChannelBound = 0x800 // require channel bindings
+
+	// Microsoft extensions - see RFC 4757 § 7.1
+	ContextFlagDceStyle      = 0x1000 // add extra AP-REP from client to server after receiving server's AP-REP
+	ContextFlagIdentify      = 0x2000 // server should identify the client but not impersonate it
+	ContextFlagExtendedError = 0x4000 // return Windows status code in Kerberos error messages
 )
 
 // FlagList returns a slice of individual flags derived from the
@@ -48,6 +56,14 @@ func FlagName(f ContextFlag) string {
 		return "Integrity"
 	case ContextFlagAnon:
 		return "Anonymous"
+	case ContextFlagChannelBound:
+		return "Channel Bindings"
+	case ContextFlagDceStyle:
+		return "DCE style"
+	case ContextFlagIdentify:
+		return "Identify only"
+	case ContextFlagExtendedError:
+		return "Extended errors"
 	}
 
 	return "Unknown"

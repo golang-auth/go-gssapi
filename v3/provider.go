@@ -43,10 +43,11 @@ func NewProvider(name string) Provider {
 type QoP uint
 
 type InitSecContextOptions struct {
-	Credential Credential
-	Mech       GssMech
-	Flags      ContextFlag
-	Lifetime   time.Duration
+	Credential     Credential
+	Mech           GssMech
+	Flags          ContextFlag
+	Lifetime       time.Duration
+	ChannelBinding *ChannelBinding
 }
 
 type InitSecContextOption func(o *InitSecContextOptions)
@@ -72,6 +73,12 @@ func WithInitiatorFlags(flags ContextFlag) InitSecContextOption {
 func WithInitiatorLifetime(life time.Duration) InitSecContextOption {
 	return func(o *InitSecContextOptions) {
 		o.Lifetime = life
+	}
+}
+
+func WithChannelBinding(cb *ChannelBinding) InitSecContextOption {
+	return func(o *InitSecContextOptions) {
+		o.ChannelBinding = cb
 	}
 }
 
@@ -125,7 +132,7 @@ type Provider interface {
 	//
 	//   A partially established context may allow the creation of protected messages.
 	//   Check the [SecContextInfo.ProtectionReady] flag by calling [SecContext.Inquire()].
-	AcceptSecContext(cred Credential, inputToken []byte) (SecContext, []byte, error) // RFC 2743 § 2.2.2
+	AcceptSecContext(cred Credential, inputToken []byte, cb *ChannelBinding) (SecContext, []byte, error) // RFC 2743 § 2.2.2
 
 	// ImportSecContext corresponds to the GSS_Import_sec_context function from RFC 2743 § 2.2.9
 	// Parameters:

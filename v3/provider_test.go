@@ -20,12 +20,12 @@ func (someProvider) AcquireCredential(name GssName, mechs []GssMech, usage CredU
 	return nil, nil
 }
 
-func (someProvider) InitSecContext(name GssName, opts ...InitSecContextOption) (SecContext, []byte, error) {
-	return nil, nil, nil
+func (someProvider) InitSecContext(name GssName, opts ...InitSecContextOption) (SecContext, error) {
+	return nil, nil
 }
 
-func (someProvider) AcceptSecContext(cred Credential, inputToken []byte) (SecContext, []byte, error) {
-	return nil, nil, nil
+func (someProvider) AcceptSecContext(cred Credential) (SecContext, error) {
+	return nil, nil
 }
 
 func (someProvider) ImportSecContext(b []byte) (SecContext, error) {

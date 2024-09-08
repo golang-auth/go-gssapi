@@ -3,11 +3,11 @@ package gssapi
 
 import "net"
 
-type gssAddressFamily int
+type GssAddressFamily int
 
 const (
-	GssAddrFamilyUNSPEC gssAddressFamily = 0
-	GssAddrFamilyLOCAL  gssAddressFamily = 1 << iota
+	GssAddrFamilyUNSPEC GssAddressFamily = 0
+	GssAddrFamilyLOCAL  GssAddressFamily = 1 << iota
 	GssAddrFamilyINET
 	GssAddrFamilyIMPLINK
 	GssAddrFamilyPUP

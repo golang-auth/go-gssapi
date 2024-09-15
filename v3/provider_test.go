@@ -24,7 +24,7 @@ func (someProvider) InitSecContext(name GssName, opts ...InitSecContextOption) (
 	return nil, nil, nil
 }
 
-func (someProvider) AcceptSecContext(cred Credential, inputToken []byte) (SecContext, []byte, error) {
+func (someProvider) AcceptSecContext(cred Credential, inputToken []byte, ch *ChannelBinding) (SecContext, []byte, error) {
 	return nil, nil, nil
 }
 

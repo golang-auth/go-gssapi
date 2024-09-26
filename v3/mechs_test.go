@@ -25,7 +25,7 @@ func TestMechOidString(t *testing.T) {
 	assert.Equal("1.3.6.1.5.2.5", oid)
 
 	badMech := gssMechImpl(100)
-	assert.PanicsWithValue(ErrBadMech, func() { badMech.OidString() })
+	assert.PanicsWithValue(ErrBadMech, func() { _ = badMech.OidString() })
 }
 
 func TestMechString(t *testing.T) {

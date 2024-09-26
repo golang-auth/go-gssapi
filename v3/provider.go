@@ -108,20 +108,15 @@ type Provider interface {
 	//   name: The GSSAPI Internal Name of the target.
 	//   opts: Optional context establishment parameters, see [InitSecContextOption].
 	// Returns:
-	//   A GSSAPI security context and a token to send to the acceptor for use with
-	//   GSS_Accept_sec_context. The returned context may or may not be fully established.
-	//
-	//   If [SecContext.ContinueNeeded()] returns true, additional message exchanges
-	//   with the acceptor are required to fully establish the security context.
-	//
-	//   A partially established context may allow the creation of protected messages.
-	//   Check the [SecContextInfo.ProtectionReady] flag by calling [SecContext.Inquire()].
-	InitSecContext(name GssName, opts ...InitSecContextOption) (SecContext, []byte, error) // RFC 2743 § 2.2.1
+	//   A uninitialized GSSAPI security context ready for exchanging tokens with the peer when
+	//   the first call to [Continue()] with an empty input token is made.  [ContinueNeeded()] will true
+	//   when this call returns successfully.
+	InitSecContext(name GssName, opts ...InitSecContextOption) (SecContext, error) // RFC 2743 § 2.2.1
 
 	// AcceptSecContext corresponds to the GSS_Accept_sec_context function from RFC 2743 § 2.2.2.
 	// Parameters:
-	//   cred:       The GSSAPI acceptor credential, or nil to use the default.
-	//   inputToken: Context establishment token received from a call to Gss_Init_sec_context.
+	//   cred: The GSSAPI acceptor credential, or nil to use the default.
+	//   cb:   Channel bindings information, or nil for no channel bindings
 	// Returns:
 	//   A GSSAPI security context and an optional token to send back to the initiator
 	//   for consumption by GSS_Init_sec_context ([SecContext.Continue()] in the Go implementation)
@@ -132,7 +127,7 @@ type Provider interface {
 	//
 	//   A partially established context may allow the creation of protected messages.
 	//   Check the [SecContextInfo.ProtectionReady] flag by calling [SecContext.Inquire()].
-	AcceptSecContext(cred Credential, inputToken []byte, cb *ChannelBinding) (SecContext, []byte, error) // RFC 2743 § 2.2.2
+	AcceptSecContext(cred Credential, cb *ChannelBinding) (SecContext, error) // RFC 2743 § 2.2.2
 
 	// ImportSecContext corresponds to the GSS_Import_sec_context function from RFC 2743 § 2.2.9
 	// Parameters:

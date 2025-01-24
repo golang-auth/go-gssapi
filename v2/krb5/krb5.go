@@ -12,37 +12,36 @@ code that uses GSS-API would import the generic github.com/golang-auth/go-gssapi
 package instead and obtain a handle to this mechanism from the registry by
 passing the name "kerberos_v5" or the OID "1.2.840.113554.1.2.2", eg :
 
-Main Package
+# Main Package
 
 A relatively high-level package should include the mechanisms that the
 application is to use.  The idea is that the mechanisms that are supported
 in an application can be managed in one place, without changing any of
 the lower level code that uses the GSS-API functionality:
 
- package main
- import (
-	 _ "github.com/golang-auth/go-gssapi/v2/krb5"
-	 "stuff"
- )
+	 package main
+	 import (
+		 _ "github.com/golang-auth/go-gssapi/v2/krb5"
+		 "stuff"
+	 )
 
- stuff.doStuff("kerberos_v5")
+	 stuff.doStuff("kerberos_v5")
 
-
-Implementation package
+# Implementation package
 
 The package that uses GSS-API should accept the name of the mechanism to
 use, and use that name to obtain an instance of that mechanism-specific
 implementation:
 
- package stuff
- import "github.com/golang-auth/go-gssapi/v2"
+	package stuff
+	import "github.com/golang-auth/go-gssapi/v2"
 
- func doStuff(mech) {
- 	ctx := gssapi.NewMech(mech)
-    ...
- }
+	func doStuff(mech) {
+		ctx := gssapi.NewMech(mech)
+	   ...
+	}
 
-See Also
+# See Also
 
 github.com/golang-auth/go-gssapi/v2
 */
@@ -264,7 +263,7 @@ func (m *Krb5Mech) Accept(serviceName string) (err error) {
 // It is highly recommended to make use of mutual authentication wherever
 // possible and to include replay detection:
 //
-//  gssapi.ContextFlagMutual | gssapi.ContextFlagInteg  |gssapi.ContextFlagReplay
+//	gssapi.ContextFlagMutual | gssapi.ContextFlagInteg  |gssapi.ContextFlagReplay
 //
 // Most users should also include gssapi.ContextFlagConf to enable the use
 // of message sealing.
@@ -276,6 +275,30 @@ func (m *Krb5Mech) Initiate(serviceName string, requestFlags gssapi.ContextFlag,
 
 	// Obtain a Kerberos ticket for the service
 	if err = m.krbClientInit(serviceName); err != nil {
+		return
+	}
+
+	// Stash the subset of the request flags that we can support minus mutual until that completes
+	m.sessionFlags = gssapi.ContextFlagConf | gssapi.ContextFlagInteg |
+		gssapi.ContextFlagReplay | gssapi.ContextFlagSequence
+
+	// requuest flags is the subset that we support of the requested flags, used in the context
+	// negotiation.  The set we will tell the caller that we actually support is the above,
+	// sessionFlags which may include more than the requested set
+	m.requestFlags = requestFlags & (gssapi.ContextFlagConf | gssapi.ContextFlagInteg |
+		gssapi.ContextFlagMutual | gssapi.ContextFlagReplay | gssapi.ContextFlagSequence)
+
+	return
+}
+
+func (m *Krb5Mech) InitiateByPrincipalAndPath(principal, keytab, krbconf, serviceName string, requestFlags gssapi.ContextFlag, cb *common.ChannelBinding) (err error) {
+	m.isEstablished = false
+	m.waitingForMutual = false
+	m.isInitiator = true
+	m.channelBinding = cb
+
+	// Obtain a Kerberos ticket for the service
+	if err = m.krbClientWithPrincipal(principal, keytab, krbconf, serviceName); err != nil {
 		return
 	}
 
@@ -716,6 +739,43 @@ func (m *Krb5Mech) getAPRepMessage() (aprep aPRep, err error) {
 
 	m.ourSequenceNumber = uint64(seqNum)
 	return aprep, err
+}
+
+func (m *Krb5Mech) krbClientWithPrincipal(principal, keytabPath, krbconfPath, service string) (err error) {
+
+	unameAndrealm := strings.Split(principal, "@")
+	if len(unameAndrealm) != 2 {
+		return fmt.Errorf("gssapi: invalid principal '%s' , should be format as uname@relaim", principal)
+	}
+	if len(keytabPath) == 0 {
+		keytabPath = krbKtFile()
+	}
+	if len(krbconfPath) == 0 {
+		krbconfPath = krbConfFile()
+	}
+
+	cfg, err := config.Load(krbconfPath)
+	if err != nil {
+		return fmt.Errorf("gssapi: loading krb5.conf: %w", err)
+	}
+	kt, err := keytab.Load(keytabPath)
+	if err != nil {
+		return fmt.Errorf("gssapi: loading keytab: %w", err)
+	}
+	m.krbClient = client.NewWithKeytab(unameAndrealm[0], unameAndrealm[1], kt, cfg)
+
+	if err := m.krbClient.AffirmLogin(); err != nil {
+		return fmt.Errorf("gssapi: checking TGT: %s", err)
+	}
+	tkt, key, err := m.krbClient.GetServiceTicket(service)
+	if err != nil {
+		return fmt.Errorf("gssapi: getting service ticket for '%s': %s", m.service, err)
+	}
+	m.ticket, m.sessionKey, m.service = &tkt, &key, service
+	m.peerName = fmt.Sprintf("%s@%s", tkt.SName.PrincipalNameString(), tkt.Realm)
+
+	return nil
+
 }
 
 func (m *Krb5Mech) krbClientInit(service string) (err error) {

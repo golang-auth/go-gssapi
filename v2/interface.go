@@ -53,6 +53,9 @@ type Mech interface {
 	// properties of the context.
 	Initiate(serviceName string, flags ContextFlag, cb *common.ChannelBinding) (err error)
 
+	// InitiateByPrincipalAndPath is the same as Initiate but using principal to initiate the context
+	// and support config the file path of keytab and krb5.conf
+	InitiateByPrincipalAndPath(principal, keytab, krbconf, serviceName string, requestFlags ContextFlag, cb *common.ChannelBinding) (err error)
 	// Accept is used by a GSS-API Acceptor to begin context
 	// negotiation with a remote Initiator.
 	// If provided, serviceName is the mechanism specific identifier

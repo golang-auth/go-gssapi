@@ -54,6 +54,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	if err := client.InitiateByPrincipalAndPath("apache/apache@HADOOP.COM", "/etc/krb5.keytab", "/etc/krb5.conf", service, flags, nil); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 
 	var inToken, outToken []byte
 

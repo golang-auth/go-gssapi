@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+
 package gssapi
 
 import (
@@ -34,6 +35,14 @@ func (someProvider) ImportSecContext(b []byte) (SecContext, error) {
 
 func (someProvider) InquireNamesForMech(m GssMech) ([]GssNameType, error) {
 	return nil, nil
+}
+
+func (someProvider) IndicateMechs() ([]GssMech, error) {
+	return nil, nil
+}
+
+func (someProvider) HasExtension(e GssapiExtension) bool {
+	return false
 }
 
 func TestRegister(t *testing.T) {
@@ -88,7 +97,7 @@ func TestInitSecContextOptions(t *testing.T) {
 
 	opts := []InitSecContextOption{
 		WithInitiatorCredential(cred),
-		WithInitatorMech(GSS_MECH_KRB5),
+		WithInitiatorMech(GSS_MECH_KRB5),
 		WithInitiatorFlags(ContextFlagMutual | ContextFlagInteg),
 		WithInitiatorLifetime(time.Second * 123),
 	}

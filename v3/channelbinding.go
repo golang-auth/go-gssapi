@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+
 package gssapi
 
 import "net"
@@ -6,8 +7,8 @@ import "net"
 type GssAddressFamily int
 
 const (
-	GssAddrFamilyUNSPEC GssAddressFamily = 0
-	GssAddrFamilyLOCAL  GssAddressFamily = 1 << iota
+	GssAddrFamilyUNSPEC GssAddressFamily = iota
+	GssAddrFamilyLOCAL
 	GssAddrFamilyINET
 	GssAddrFamilyIMPLINK
 	GssAddrFamilyPUP

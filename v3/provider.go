@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+
 package gssapi
 
 import (
@@ -58,7 +59,7 @@ func WithInitiatorCredential(cred Credential) InitSecContextOption {
 	}
 }
 
-func WithInitatorMech(mech GssMech) InitSecContextOption {
+func WithInitiatorMech(mech GssMech) InitSecContextOption {
 	return func(o *InitSecContextOptions) {
 		o.Mech = mech
 	}
@@ -82,6 +83,24 @@ func WithChannelBinding(cb *ChannelBinding) InitSecContextOption {
 	}
 }
 
+type GssapiExtension int
+
+const (
+	GssapiExtHasChannelBound           GssapiExtension = iota
+	GssapiExtHasInquireSecContextByOid                 // where is this defined in the MIT source ?    https://ogf.org/documents/GFD.24.pdf
+	GssapiExtHasInquireName                            // RFC 6680 § 7.4
+	GssapiExtHasGetNameAttributes                      // RFC 6680 § 7.5
+	GssapiExtHasSetNameAttributes                      // RFC 6680 § 7.6
+	GssapiExtHasDeleteNameAttributes                   // RFC 6680 § 7.7
+	GssapiExtHasExportNameComposite                    // RFC 6680 § 7.8
+	GssapiExtHasIndicateMechsByAttrs                   // RFC 5587 § 3.4.2
+	GssapiExtHasInquireAttrsForMech                    // RFC 5587 § 3.4.3
+	GssapiExtHasDisplayMechAttr                        // RFC 5587 § 3.4.4
+)
+
+// TODO: Add mech attrs fom RFC 5587
+// SPNEGO in RFC 4187
+
 // Provider is the interface that defines the top level GSSAPI functions that
 // create name, credential and security contexts
 type Provider interface {
@@ -102,6 +121,8 @@ type Provider interface {
 	// Returns:
 	//   A GSSAPI credential suitable for InitSecContext or AcceptSecContext, based on the usage.
 	AcquireCredential(name GssName, mechs []GssMech, usage CredUsage, lifetime time.Duration) (Credential, error) // RFC 2743 § 2.1.1
+
+	// NOTE:  RFC7546
 
 	// InitSecContext corresponds to the GSS_Init_sec_context function from RFC 2743 § 2.2.1.
 	// Parameters:
@@ -137,10 +158,18 @@ type Provider interface {
 	ImportSecContext(b []byte) (SecContext, error) // RFC 2743 § 2.2.9
 
 	// InquireNamesForMech corresponds to the GSS_Inquire_names_for_mech function
-	// from RFC 2743 § 2.4.12.  It returns the name types supported byu a specified mechanism.
+	// from RFC 2743 § 2.4.12.  It returns the name types supported by a specified mechanism.
 	// Parameters:
 	//   m:      The GSS Name to query
 	// Returns:
 	//   List of name types supported, or an error
 	InquireNamesForMech(m GssMech) ([]GssNameType, error) // RFC 2743 § 2.4.12
+
+	// IndicateMechs corresponds to the GSS_Indicate_mechs function from RFC 2743 § 2.4.2.
+	// Returns:
+	//   List of mechanisms supported, or an error
+	IndicateMechs() ([]GssMech, error) // RFC 2743 § 2.4.2
+
+	// HasExtension reports whether a non-standard extension to GSSAPI is available
+	HasExtension(e GssapiExtension) bool
 }

@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
+
 package gssapi
 
 import "slices"
 
 //go:generate  go run ../build-tools/gen-gss-mech-oids.go -o mechs_gen.go
 
+// GssMech describes an available GSSAPI mechanism.
 type GssMech interface {
 	Oid() Oid
 	OidString() string
@@ -14,8 +16,9 @@ type GssMech interface {
 // gssMechImpl defines GSSAPI mechanisms
 type gssMechImpl int
 
+// Well known GSSAPI mechanisms
 const (
-	// Official Kerberos Mech (IETF)
+	// Official Kerberos Mechanism (IETF)
 	GSS_MECH_KRB5 gssMechImpl = iota
 
 	GSS_MECH_IAKERB
@@ -23,10 +26,12 @@ const (
 	GSS_MECH_SPNEGO
 
 	GSS_MECH_SPKM
+
+	_GSS_MECH_LAST
 )
 
 func (mech gssMechImpl) Oid() Oid {
-	if mech > GSS_MECH_SPNEGO {
+	if mech >= _GSS_MECH_LAST {
 		panic(ErrBadMech)
 	}
 
@@ -34,7 +39,7 @@ func (mech gssMechImpl) Oid() Oid {
 }
 
 func (mech gssMechImpl) OidString() string {
-	if mech > GSS_MECH_SPNEGO {
+	if mech >= _GSS_MECH_LAST {
 		panic(ErrBadMech)
 	}
 
@@ -42,7 +47,7 @@ func (mech gssMechImpl) OidString() string {
 }
 
 func (mech gssMechImpl) String() string {
-	if mech > GSS_MECH_SPNEGO {
+	if mech >= _GSS_MECH_LAST {
 		panic(ErrBadMech)
 	}
 

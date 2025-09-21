@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package main
 
 import (
@@ -11,6 +13,7 @@ import (
 	"text/template"
 )
 
+// ORDER MATTERS - must be the same as names.go!
 var namesToOids = []struct {
 	name    string
 	oid     string
@@ -24,6 +27,7 @@ var namesToOids = []struct {
 	{"GSS_NO_OID", "", []string{}},
 	{"GSS_NT_EXPORT_NAME", "1.3.6.1.5.6.4", []string{}},
 	{"GSS_NO_NAME", "", []string{}},
+	{"GSS_NT_COMPOSITE_EXPORT", "1.3.6.1.5.6.6", []string{}},
 	{"GSS_KRB5_NT_PRINCIPAL_NAME", "1.2.840.113554.1.2.2.1", []string{"1.2.840.48018.1.2.2"}},
 	{"GSS_KRB5_NT_ENTERPRISE_NAME", "1.2.840.113554.1.2.2.6", []string{}},
 	{"GSS_KRB5_NT_X509_CERT", "1.2.840.113554.1.2.2.7", []string{}},
@@ -32,7 +36,9 @@ var namesToOids = []struct {
 	{"GSS_SPKM_NT_STRING_UID_NAME", "1.2.840.113554.1.2.1.3", []string{}},
 }
 
-var codeTemplate = `package gssapi
+var codeTemplate = `// SPDX-License-Identifier: Apache-2.0
+
+package gssapi
 
 // GENERATED CODE: DO NOT EDIT
 
@@ -145,7 +151,7 @@ func makeParams() []tmplParam {
 func bytesFormat(b []byte) string {
 	strs := make([]string, len(b))
 	for i, s := range b {
-		strs[i] = fmt.Sprintf("0x%x", s)
+		strs[i] = fmt.Sprintf("0x%02x", s)
 	}
 	return strings.Join(strs, ", ")
 }

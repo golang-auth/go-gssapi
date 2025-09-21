@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+
 package gssapi
 
 // GSSAPI Credential Management, RFC 2743 § 2.1

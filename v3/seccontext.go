@@ -1,28 +1,25 @@
 // SPDX-License-Identifier: Apache-2.0
-package gssapi
 
-import "time"
+package gssapi
 
 // GSSAPI Security-Context Management, RFC 2743 § 2.2
 
 type SecContextInfo struct {
-	InitiatorName     string
-	InitiatorNameType GssNameType
-	AcceptorName      string
-	AcceptorNameType  GssNameType
-	Mech              GssMech
-	Flags             ContextFlag
-	ExpiresAt         *time.Time
-	LocallyInitiated  bool
-	FullyEstablished  bool
-	ProtectionReady   bool
-	Transferrable     bool
+	InitiatorName    GssName
+	AcceptorName     GssName
+	Mech             GssMech
+	Flags            ContextFlag
+	ExpiresAt        GssLifetime
+	LocallyInitiated bool
+	FullyEstablished bool
+	ProtectionReady  bool
+	Transferrable    bool
 }
 
 type SecContext interface {
 	Delete() ([]byte, error)                      // RFC 2743 § 2.2.3
 	ProcessToken([]byte) error                    // RFC 2743 § 2.2.4
-	ExpiresAt() (*time.Time, error)               // RFC 2743 § 2.2.5
+	ExpiresAt() (*GssLifetime, error)             // RFC 2743 § 2.2.5
 	Inquire() (*SecContextInfo, error)            // RFC 2743 § 2.2.6
 	WrapSizeLimit(bool, uint, QoP) (uint, error)  // RFC 2743 § 2.2.7
 	Export() ([]byte, error)                      // RFC 2743 § 2.2.8

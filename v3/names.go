@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+
 package gssapi
 
 import (
@@ -21,11 +22,14 @@ type GssName interface {
 	Duplicate() (GssName, error)           // RFC 2743 § 2.4.16
 }
 
+// NOTE: if the order here changes also change
+// gen-gss-name-oids.go!
+
 const (
 	// Host-based name form (RFC 2743 § 4.1),      "service@host" or just "service"
 	GSS_NT_HOSTBASED_SERVICE GssNameType = iota
 
-	// User namne form (RFC 2743 § 4.2),           "username" : named local user
+	// User name form (RFC 2743 § 4.2),            "username" : named local user
 	GSS_NT_USER_NAME
 
 	// Machine UID form (RFC 2743 § 4.3),           Numeric user ID in host byte order; use gss_import_name to convert to user name form
@@ -46,9 +50,12 @@ const (
 	// No name type (RFC 2743 § 4.8),               Indicates that no name is being passed;  used only in gss_acquire_cred, gss_add_cred, gss_init_sec_context
 	GSS_NO_NAME
 
+	// Composite name type (RFC 6680 § 8)			Exported name including name attributes
+	GSS_NT_COMPOSITE_EXPORT
+
 	// Mech specific name types
 
-	// Kerberos Principal Name (RFC 1964 § 2.1.1)           Kerberos prinicpal name with optional @REALM
+	// Kerberos Principal Name (RFC 1964 § 2.1.1)           Kerberos principal name with optional @REALM
 	GSS_KRB5_NT_PRINCIPAL_NAME
 
 	// Kerberos Enterprise Principal Name (RFC 8606 § 5)    Kerberos principal alias
@@ -60,10 +67,12 @@ const (
 	GSS_SPKM_NT_USER_NAME
 	GSS_SPKM_NT_MACHINE_UID_NAME
 	GSS_SPKM_NT_STRING_UID_NAME
+
+	_GSS_NAME_TYPE_LAST
 )
 
 func (nt GssNameType) Oid() Oid {
-	if nt > GSS_KRB5_NT_X509_CERT {
+	if nt >= _GSS_NAME_TYPE_LAST {
 		panic(ErrBadNameType)
 	}
 
@@ -71,7 +80,7 @@ func (nt GssNameType) Oid() Oid {
 }
 
 func (nt GssNameType) OidString() string {
-	if nt > GSS_KRB5_NT_X509_CERT {
+	if nt >= _GSS_NAME_TYPE_LAST {
 		panic(ErrBadNameType)
 	}
 
@@ -79,7 +88,7 @@ func (nt GssNameType) OidString() string {
 }
 
 func (nt GssNameType) String() string {
-	if nt > GSS_KRB5_NT_X509_CERT {
+	if nt >= _GSS_NAME_TYPE_LAST {
 		panic(ErrBadNameType)
 	}
 

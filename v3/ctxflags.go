@@ -1,18 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
+
 package gssapi
 
 import "strings"
 
+// The ContextFlag type holds the possible the security context reqest flags
 type ContextFlag uint32
 
-// GSS-API request context flags - the same as C bindings for compatibility
+// GSS-API context flags - the values are the same as C bindings for compatibility
+// The flags are used when initializing a security context and may be queried
+// to determine the protection levels available.
 const (
 	ContextFlagDeleg    ContextFlag = 1 << iota // delegate credentials, not currently supported
 	ContextFlagMutual                           // request remote peer authenticates itself
 	ContextFlagReplay                           // enable replay detection for signed/sealed messages
 	ContextFlagSequence                         // enable detection of out of sequence signed/sealed messages
-	ContextFlagConf                             // confidentiality available
-	ContextFlagInteg                            // integrity available
+	ContextFlagConf                             // request confidentiality / condidentiality available
+	ContextFlagInteg                            // request integrity / integrity available
 	ContextFlagAnon                             // do not transfer initiator identity to acceptor
 
 	// extensions
@@ -69,6 +73,7 @@ func FlagName(f ContextFlag) string {
 	return "Unknown"
 }
 
+// Returns a string describing the enabled flags
 func (f ContextFlag) String() string {
 	var names []string
 	for _, flag := range FlagList(f) {

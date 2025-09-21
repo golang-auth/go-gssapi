@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package main
 
 import (
@@ -27,7 +29,9 @@ var namesToOids = []struct {
 	{"GSS_MECH_SPKM-3", "1.3.6.1.5.5.1.3", []string{}},
 }
 
-var codeTemplate = `package gssapi
+var codeTemplate = `// SPDX-License-Identifier: Apache-2.0
+
+package gssapi
 
 // GENERATED CODE: DO NOT EDIT
 
@@ -140,7 +144,7 @@ func makeParams() []tmplParam {
 func bytesFormat(b []byte) string {
 	strs := make([]string, len(b))
 	for i, s := range b {
-		strs[i] = fmt.Sprintf("0x%x", s)
+		strs[i] = fmt.Sprintf("0x%02x", s)
 	}
 	return strings.Join(strs, ", ")
 }

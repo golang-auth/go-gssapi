@@ -9,7 +9,8 @@ cleanup() {
 trap cleanup EXIT
 
 
-gofmt -l -d . >${TMPDIR}/fmt.out
+find . -name \*.go -type f \! -name \*_gen.go \
+  | xargs gofmt -l -d  >${TMPDIR}/fmt.out
 
 if [ -s ${TMPDIR}/fmt.out ];
 then

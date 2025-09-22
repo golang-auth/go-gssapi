@@ -5,7 +5,7 @@ go-gssapi provides GSSAPI bindings for Go.
 ![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/golang-auth/go-gssapi)
 [![Git Workflow](https://img.shields.io/github/actions/workflow/status/golang-auth/go-gssapi/checks.yml?branch=dev
 )](https://img.shields.io/github/actions/workflow/status/golang-auth/go-gssapi/checks.yml?branch=de)
-[![Go Version](https://img.shields.io/badge/go%20version-%3E=1.18-61CFDD.svg?style=flat-square)](https://golang.org/)
+[![Go Version](https://img.shields.io/badge/go%20version-%3E=1.24-61CFDD.svg?style=flat-square)](https://golang.org/)
 [![GO Reference](https://pkg.go.dev/badge/mod/github.com/golang-auth/go-gssapi)](https://pkg.go.dev/mod/github.com/golang-auth/go-gssapi/v3)
 
 # Overview

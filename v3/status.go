@@ -42,6 +42,7 @@ const (
 	errUnavailable
 	errDuplicateElement
 	errNameNotMn
+	errBadMechAttr
 
 	errBadSig = errBadMic
 )
@@ -73,6 +74,7 @@ var ErrUnauthorized = errors.New("the operation is forbidden by local security p
 var ErrUnavailable = errors.New("the operation or option is not available or supported")
 var ErrDuplicateElement = errors.New("the requested credential element already exists")
 var ErrNameNotMn = errors.New("the provided name was not mechanism specific (MN)")
+var ErrBadMechAttr = errors.New("an unsupported mechanism attribute was requested")
 
 //lint:ignore ST1012 these aren't actually errors
 var InfoContinueNeeded = errors.New("the routine must be called again to complete its function")
@@ -129,6 +131,8 @@ func (s FatalStatus) Fatal() error {
 		return ErrDuplicateElement
 	case errNameNotMn:
 		return ErrNameNotMn
+	case errBadMechAttr:
+		return ErrBadMechAttr
 	}
 }
 

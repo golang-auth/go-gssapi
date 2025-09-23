@@ -69,6 +69,10 @@ func TestNameFromOid(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(GSS_NT_HOSTBASED_SERVICE, nt)
 
+	nt, err = NameFromOid(Oid{0x2a, 0x86, 0x48, 0x82, 0xf7, 0x12, 0x01, 0x02, 0x02})
+	assert.NoError(err)
+	assert.Equal(GSS_KRB5_NT_PRINCIPAL_NAME, nt)
+
 	// from a bad oid
 	_, err = NameFromOid(Oid{0x00})
 	assert.ErrorIs(err, ErrBadNameType)

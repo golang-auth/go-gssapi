@@ -83,22 +83,6 @@ func WithChannelBinding(cb *ChannelBinding) InitSecContextOption {
 	}
 }
 
-type GssapiExtension int
-
-const (
-	GssapiExtHasChannelBound           GssapiExtension = iota
-	GssapiExtHasInquireSecContextByOid                 // where is this defined in the MIT source ?    https://ogf.org/documents/GFD.24.pdf
-	GssapiExtHasInquireName                            // RFC 6680 § 7.4
-	GssapiExtHasGetNameAttributes                      // RFC 6680 § 7.5
-	GssapiExtHasSetNameAttributes                      // RFC 6680 § 7.6
-	GssapiExtHasDeleteNameAttributes                   // RFC 6680 § 7.7
-	GssapiExtHasExportNameComposite                    // RFC 6680 § 7.8
-	GssapiExtHasIndicateMechsByAttrs                   // RFC 5587 § 3.4.2
-	GssapiExtHasInquireAttrsForMech                    // RFC 5587 § 3.4.3
-	GssapiExtHasDisplayMechAttr                        // RFC 5587 § 3.4.4
-)
-
-// TODO: Add mech attrs fom RFC 5587
 // SPNEGO in RFC 4187
 
 // Provider is the interface that defines the top level GSSAPI functions that
@@ -172,4 +156,9 @@ type Provider interface {
 
 	// HasExtension reports whether a non-standard extension to GSSAPI is available
 	HasExtension(e GssapiExtension) bool
+}
+
+type ProviderExtRFC5587 interface {
+	Provider
+	IndicateMechsByAttrs([]GssMechAttr, []GssMechAttr, []GssMechAttr) ([]GssMech, error) // RFC 5587 § 3.4.2
 }

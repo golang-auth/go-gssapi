@@ -18,8 +18,8 @@ const (
 type CredInfo struct {
 	Name            string
 	NameType        GssNameType
-	InitiatorExpiry *time.Time // nil: not supported, zero: expired
-	AcceptorExpiry  *time.Time // nil: not supported, zero: expired
+	InitiatorExpiry GssLifetime
+	AcceptorExpiry  GssLifetime
 	Usage           CredUsage
 	Mechs           []GssMech
 }

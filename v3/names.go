@@ -110,3 +110,33 @@ func NameFromOid(oid Oid) (GssNameType, error) {
 
 	return 0, ErrBadNameType
 }
+
+// Extensions
+
+type InquireNameInfo struct {
+	IsMechName bool
+	Mech       GssMech
+	Attributes []string
+}
+
+type NameAttributes struct {
+	Authenticated bool
+	Complete      bool
+	Values        []string
+	DisplayValues []string
+}
+
+type GssNameExtRFC6680 interface {
+	GssName
+	DisplayExt(GssNameType) (string, error)       // RFC 6680 § 7.3
+	Inquire() (InquireNameInfo, error)            // RFC 6680 § 7.4
+	GetAttributes(string) (NameAttributes, error) // RFC 6680 § 7.5
+	SetAttributes(bool, string, []string) error   // RFC 6680 § 7.6
+	DeleteNameAttributes(string) error            // RFC 6680 § 7.7
+	ExportComposite() ([]byte, error)             // RFC 6680 § 7.8
+}
+
+type GssNameExtLocalname interface {
+	GssName
+	Localname(GssMech) (string, error)
+}

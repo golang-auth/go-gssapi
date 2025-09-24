@@ -16,8 +16,24 @@ func init() {
 	registry.libs = make(map[string]ProviderFactory)
 }
 
+// ProviderFactory defines the function signature passed to RegisterProvider, used
+// by the registration interface to create new instances of a provider.
 type ProviderFactory func() Provider
 
+// RegisterProvider associates the supplied provider factory with the unique
+// name for the provider. If a provider with name is already registered, the new
+// factory function will replace the existing registration.
+//
+// GSSAPI providers must register themselves by calling RegisterProvider in their
+// init() function. Providers should document the unique name used in their call
+// to RegisterProvider.
+//
+// Parameters:
+//   - name: unique name (identifier) of the provider. The author should document this
+//     identifier for consumption by users of the provider.
+//   - f: function that can be used to instantiate the provider
+//
+// The function always succeeds.
 func RegisterProvider(name string, f ProviderFactory) {
 	registry.Lock()
 	defer registry.Unlock()
@@ -25,6 +41,20 @@ func RegisterProvider(name string, f ProviderFactory) {
 	registry.libs[name] = f
 }
 
+// NewProvider is used to instantiate a provider given its unique name. It does this by calling
+// the provider factory function registered against the name. The function panics if name is
+// not registered.
+//
+// This unique name is then used by consumer code to instantiate the desired GSSAPI implementation
+// using the NewProvider method.
+//
+// Parameters:
+//   - name: unique name of a previously registered provider
+//
+// Returns:
+//   - p: provider instance
+//
+// Panics if the provider name is not registered.
 func NewProvider(name string) Provider {
 	registry.Lock()
 	defer registry.Unlock()
@@ -41,49 +71,63 @@ func NewProvider(name string) Provider {
 	return f()
 }
 
+// QoP represents quality of protection values used in various security context operations
+// like GetMIC, VerifyMIC, Wrap, Unwrap, and WrapSizeLimit. A zero value represents the
+// default quality of protection.
 type QoP uint
 
+// InitSecContextOptions holds the optional parameters for initializing a security context.
+// These options correspond to the optional parameters of GSS_Init_sec_context from RFC 2743 § 2.2.1.
 type InitSecContextOptions struct {
-	Credential     Credential
-	Mech           GssMech
-	Flags          ContextFlag
-	Lifetime       time.Duration
-	ChannelBinding *ChannelBinding
+	Credential     Credential      // Source credential for context establishment
+	Mech           GssMech         // Specific mechanism to use
+	Flags          ContextFlag     // Requested protection flags
+	Lifetime       time.Duration   // Desired context lifetime
+	ChannelBinding *ChannelBinding // Channel binding information
 }
 
+// InitSecContextOption is a function type for configuring InitSecContext options.
 type InitSecContextOption func(o *InitSecContextOptions)
 
+// WithInitiatorCredential supports the use of a source credential when initiating a security context,
+// corresponding to the claimant_cred_handle parameter to GSS_Init_sec_context from the RFC.
 func WithInitiatorCredential(cred Credential) InitSecContextOption {
 	return func(o *InitSecContextOptions) {
 		o.Credential = cred
 	}
 }
 
+// WithInitiatorMech supports the use of a specific mechanism when establishing the context,
+// corresponding to the mech_type parameter to GSS_Init_sec_context from the RFC.
 func WithInitiatorMech(mech GssMech) InitSecContextOption {
 	return func(o *InitSecContextOptions) {
 		o.Mech = mech
 	}
 }
 
+// WithInitiatorFlags allows the caller to control the requested protection flags when establishing
+// a security context, corresponding to the *_req_flag parameters of GSS_Init_sec_context from the RFC.
 func WithInitiatorFlags(flags ContextFlag) InitSecContextOption {
 	return func(o *InitSecContextOptions) {
 		o.Flags = flags
 	}
 }
 
+// WithInitiatorLifetime supports the use of a non-default context lifetime, corresponding to
+// the lifetime_req parameter of GSS_Init_sec_context from the RFC.
 func WithInitiatorLifetime(life time.Duration) InitSecContextOption {
 	return func(o *InitSecContextOptions) {
 		o.Lifetime = life
 	}
 }
 
+// WithChannelBinding supports the use of channel binding information when establishing the context,
+// corresponding to the input_chan_bindings parameter of GSS_Init_sec_context from the RFC.
 func WithChannelBinding(cb *ChannelBinding) InitSecContextOption {
 	return func(o *InitSecContextOptions) {
 		o.ChannelBinding = cb
 	}
 }
-
-// SPNEGO in RFC 4187
 
 // Provider is the interface that defines the top level GSSAPI functions that
 // create name, credential and security contexts
@@ -105,9 +149,6 @@ type Provider interface {
 	// Returns:
 	//   A GSSAPI credential suitable for InitSecContext or AcceptSecContext, based on the usage.
 	AcquireCredential(name GssName, mechs []GssMech, usage CredUsage, lifetime time.Duration) (Credential, error) // RFC 2743 § 2.1.1
-
-	// NOTE:  RFC7546
-
 	// InitSecContext corresponds to the GSS_Init_sec_context function from RFC 2743 § 2.2.1.
 	// Parameters:
 	//   name: The GSSAPI Internal Name of the target.
@@ -158,7 +199,13 @@ type Provider interface {
 	HasExtension(e GssapiExtension) bool
 }
 
+// ProviderExtRFC5587 extends the Provider interface with RFC 5587 mechanism attribute functionality.
+// Providers implementing this interface support mechanism attribute queries for indicating mechanisms
+// by their attributes. Provider support for RFC 5587 can be determined with a call to
+// `HasExtension(HasExtRFC5587)`.
 type ProviderExtRFC5587 interface {
 	Provider
+	// IndicateMechsByAttrs indicates mechanisms by attributes as defined in RFC 5587 § 3.4.2.
+	// The three parameters represent desired attributes, except attributes, and critical attributes respectively.
 	IndicateMechsByAttrs([]GssMechAttr, []GssMechAttr, []GssMechAttr) ([]GssMech, error) // RFC 5587 § 3.4.2
 }

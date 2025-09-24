@@ -7,19 +7,34 @@ import (
 	"strings"
 )
 
+// InfoStatus represents informational status codes returned when an informational code is available
+// but a function otherwise succeeded. This is only the case for the message-related methods of
+// SecContext, such as SecContext.VerifyMIC and SecContext.Unwrap.
+//
+// The Go bindings use Go's standard error interface instead of the major and minor status codes
+// specified in RFC 2743 § 1.2.1. InfoStatus objects are returned when an informational code
+// is available but a function otherwise succeeded.
 type InfoStatus struct {
-	InformationCode InformationCode
-	MechErrors      []error
+	InformationCode InformationCode // The informational status code
+	MechErrors      []error         // Mechanism-specific errors
 }
 
+// FatalStatus represents fatal error status codes returned when a function fails.
+// Fatal errors may also include an embedded InfoStatus error.
+//
+// The Go bindings use Go's standard error interface instead of the major and minor status codes
+// specified in RFC 2743 § 1.2.1. FatalStatus objects are returned when a function fails.
 type FatalStatus struct {
-	InfoStatus
-	FatalErrorCode FatalErrorCode
+	InfoStatus                    // Embedded informational status
+	FatalErrorCode FatalErrorCode // The fatal error code
 }
 
-// Values of runtime error and info codes are the same as the C bindings for compatibility
-// See RFC 2744 § 3.9.1
+// FatalErrorCode represents fatal error codes. Values of runtime error codes are the same as
+// the C bindings for compatibility. See RFC 2744 § 3.9.1.
 type FatalErrorCode uint32
+
+// InformationCode represents informational status codes. Values of runtime info codes are the same as
+// the C bindings for compatibility. See RFC 2744 § 3.9.1.
 type InformationCode uint32
 
 const (
@@ -55,13 +70,16 @@ const (
 	infoGapToken
 )
 
+// Fatal error variables that correspond to the fatal error codes defined by RFC 2743.
+// These variables implement the error interface and can be used with Go's standard error handling.
+
 var ErrBadMech = errors.New("an unsupported mechanism was requested")
 var ErrBadName = errors.New("an invalid name was supplied")
 var ErrBadNameType = errors.New("a supplied name was of an unsupported type")
 var ErrBadBindings = errors.New("incorrect channel bindings were supplied")
 var ErrBadStatus = errors.New("an invalid status code was supplied")
 var ErrBadMic = errors.New("a token had an invalid signature")
-var ErrBadSig = ErrBadMic
+var ErrBadSig = ErrBadMic // ErrBadSig is an alias for ErrBadMic for compatibility
 var ErrNoCred = errors.New("no credentials were supplied, or the credentials were unavailable or inaccessible")
 var ErrNoContext = errors.New("no context has been established")
 var ErrDefectiveToken = errors.New("invalid token was supplied")
@@ -75,6 +93,10 @@ var ErrUnavailable = errors.New("the operation or option is not available or sup
 var ErrDuplicateElement = errors.New("the requested credential element already exists")
 var ErrNameNotMn = errors.New("the provided name was not mechanism specific (MN)")
 var ErrBadMechAttr = errors.New("an unsupported mechanism attribute was requested")
+
+// Informational status variables that correspond to the informational codes defined by RFC 2743.
+// These are returned by InfoStatus.Unwrap() and FatalStatus.Unwrap() and can be used with Go's
+// standard error handling mechanisms like errors.Is().
 
 //lint:ignore ST1012 these aren't actually errors
 var InfoContinueNeeded = errors.New("the routine must be called again to complete its function")

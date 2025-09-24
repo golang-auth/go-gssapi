@@ -20,7 +20,10 @@ const (
 	ContextFlagAnon                             // do not transfer initiator identity to acceptor
 
 	// extensions
-	ContextFlagChannelBound = 0x800 // require channel bindings
+
+	// Require/indicate use of channel bindings
+	// https://datatracker.ietf.org/doc/html/draft-williams-kitten-channel-bound-flag-02
+	ContextFlagChannelBound = 0x800
 
 	// Microsoft extensions - see RFC 4757 § 7.1
 	ContextFlagDceStyle      = 0x1000 // add extra AP-REP from client to server after receiving server's AP-REP
@@ -61,7 +64,7 @@ func flagName(f ContextFlag) string {
 	case ContextFlagAnon:
 		return "Anonymous"
 	case ContextFlagChannelBound:
-		return "Channel Bindings"
+		return "Channel Bindings required/present"
 	case ContextFlagDceStyle:
 		return "DCE style"
 	case ContextFlagIdentify:

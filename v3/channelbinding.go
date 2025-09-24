@@ -8,7 +8,7 @@ import "net"
 // These constants correspond to the address family values used in GSSAPI channel bindings.
 type GssAddressFamily int
 
-// Address family constants for channel bindings
+// Address family constants for channel bindings, from RFC 2744 § 3.11
 const (
 	GssAddrFamilyUNSPEC  GssAddressFamily = iota // Unspecified address family
 	GssAddrFamilyLOCAL                           // Local to host (pipes, etc.)
@@ -36,7 +36,7 @@ const (
 
 // ChannelBinding represents channel binding information used to bind a security context
 // to a communication channel. The Go bindings define this type to represent channel binding
-// information as described in the GSSAPI specification.
+// information as described in the GSSAPI Channel-Bindings specification (RFC 5554).
 //
 // Channel bindings provide additional security by cryptographically binding the GSSAPI
 // authentication to properties of the underlying communication channel, making it more

@@ -43,8 +43,8 @@ func FlagList(f ContextFlag) (fl []ContextFlag) {
 	return
 }
 
-// FlagName returns a human-readable description of a context flag value
-func FlagName(f ContextFlag) string {
+// flagName returns a human-readable description of a context flag value
+func flagName(f ContextFlag) string {
 	switch f {
 	case ContextFlagDeleg:
 		return "Delegation"
@@ -77,7 +77,7 @@ func FlagName(f ContextFlag) string {
 func (f ContextFlag) String() string {
 	var names []string
 	for _, flag := range FlagList(f) {
-		names = append(names, FlagName(flag))
+		names = append(names, flagName(flag))
 	}
 
 	return strings.Join(names, ", ")

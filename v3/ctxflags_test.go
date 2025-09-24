@@ -16,12 +16,12 @@ func TestFlagList(t *testing.T) {
 }
 
 func TestFlagName(t *testing.T) {
-	assert.Equal(t, "Delegation", FlagName(ContextFlagDeleg))
-	assert.Equal(t, "Integrity", FlagName(ContextFlagInteg))
-	assert.Equal(t, "Mutual authentication", FlagName(ContextFlagMutual))
-	assert.Equal(t, "Channel Bindings", FlagName(ContextFlagChannelBound))
-	assert.Equal(t, "Anonymous", FlagName(ContextFlagAnon))
-	assert.Equal(t, "Extended errors", FlagName(ContextFlagExtendedError))
+	assert.Equal(t, "Delegation", flagName(ContextFlagDeleg))
+	assert.Equal(t, "Integrity", flagName(ContextFlagInteg))
+	assert.Equal(t, "Mutual authentication", flagName(ContextFlagMutual))
+	assert.Equal(t, "Channel Bindings", flagName(ContextFlagChannelBound))
+	assert.Equal(t, "Anonymous", flagName(ContextFlagAnon))
+	assert.Equal(t, "Extended errors", flagName(ContextFlagExtendedError))
 }
 
 func TestFlagString(t *testing.T) {

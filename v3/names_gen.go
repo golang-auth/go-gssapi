@@ -5,7 +5,7 @@ package gssapi
 // GENERATED CODE: DO NOT EDIT
 
 var nameTypes = []struct {
-	id        GssNameType
+	id        gssNameTypeImpl
 	name      string
 	oidString string
 	oid       Oid

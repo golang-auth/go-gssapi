@@ -39,7 +39,7 @@ type Credential interface {
 	// This method corresponds to GSS_Release_cred from RFC 2743 § 2.1.2.
 	//
 	// Returns:
-	//   - err: error if one occurred, otherwise nil
+	//   - error if one occurred, otherwise nil
 	Release() error // RFC 2743 § 2.1.2
 
 	// Inquire returns information about the credential, implementing the GSS_Inquire_cred call
@@ -56,7 +56,7 @@ type Credential interface {
 	// Returns:
 	//   - info: information about the credential
 	//   - err: error if one occurred, otherwise nil
-	Inquire() (*CredInfo, error) // RFC 2743 § 2.1.3
+	Inquire() (info *CredInfo, err error) // RFC 2743 § 2.1.3
 
 	// Add adds a credential element to the Credential. This method implements the GSS_Add_cred call
 	// described in RFC 2743 § 2.1.4.
@@ -78,7 +78,7 @@ type Credential interface {
 	//     CredUsageAcceptOnly or CredUsageInitiateAndAccept, or the zero value for a default value
 	//
 	// Returns:
-	//   - err: error if one occurred, otherwise nil
+	//   - error if one occurred, otherwise nil
 	Add(name GssName, mech GssMech, usage CredUsage, initiatorLifetime time.Duration, acceptorLifetime time.Duration) error // RFC 2743 § 2.1.4
 
 	// InquireByMech returns information about the credential element related to mech, implementing the
@@ -98,5 +98,5 @@ type Credential interface {
 	// Returns:
 	//   - info: information about the credential element
 	//   - err: error if one occurred, otherwise nil
-	InquireByMech(mech GssMech) (*CredInfo, error) // RFC 2743 § 2.1.5
+	InquireByMech(mech GssMech) (info *CredInfo, err error) // RFC 2743 § 2.1.5
 }

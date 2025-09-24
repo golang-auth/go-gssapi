@@ -8,9 +8,20 @@ import (
 
 //go:generate  go run ../build-tools/gen-gss-name-oids.go -o names_gen.go
 
-// GssNameType defines the name types in a mech-independent fashion,
-// as described in RFC 2743 § 4
-type GssNameType int
+// GssNameType describes an available GSSAPI Name Type (NT) as described in
+// RFC 2743 § 4.
+type GssNameType interface {
+	// Oid returns the object identifier corresponding to the name type.
+	Oid() Oid
+	// OidString returns a printable version of the object identifier associated with the mechanism.
+	OidString() string
+	// String returns a printable version of the mechanism name.
+	String() string
+}
+
+// gssNameTypeImpl is an internal type that implements the GssNameType interface for the
+// well-known name types.  It supports well known name types.
+type gssNameTypeImpl int
 
 // GssName represents GSSAPI names (types INTERNAL NAME and MN) as described in RFC 2743 § 4.
 // This interface includes support for name-related calls: GSS_Compare_name, GSS_Display_name,
@@ -29,7 +40,7 @@ type GssName interface {
 	// Returns:
 	//   - equal: boolean value indicating whether the two names are equal
 	//   - err: error if one occurred, otherwise nil
-	Compare(other GssName) (bool, error) // RFC 2743 § 2.4.3
+	Compare(other GssName) (equal bool, err error) // RFC 2743 § 2.4.3
 
 	// Display implements GSS_Display_Name from RFC 2743 § 2.4.4.
 	// It returns a string representation of the name and its type.
@@ -38,13 +49,13 @@ type GssName interface {
 	//   - disp: string representation of the name
 	//   - nt: type of the name
 	//   - err: error if one occurred, otherwise nil
-	Display() (string, GssNameType, error) // RFC 2743 § 2.4.4
+	Display() (disp string, nt GssNameType, err error) // RFC 2743 § 2.4.4
 
 	// Release implements GSS_Release_Name from RFC 2743 § 2.4.6.
 	// It releases the name when it is no longer required.
 	//
 	// Returns:
-	//   - err: error if one occurred, otherwise nil
+	//   - error if one occurred, otherwise nil
 	Release() error // RFC 2743 § 2.4.6
 
 	// InquireMechs implements GSS_Inquire_mechs_for_name from RFC 2743 § 2.4.13.
@@ -53,7 +64,7 @@ type GssName interface {
 	// Returns:
 	//   - mechs: set of mechanisms that support the name
 	//   - err: error if one occurred, otherwise nil
-	InquireMechs() ([]GssMech, error) // RFC 2743 § 2.4.13
+	InquireMechs() (mechs []GssMech, err error) // RFC 2743 § 2.4.13
 
 	// Canonicalize implements GSS_Canonicalize_name from RFC 2743 § 2.4.14.
 	// It converts the name to a mechanism-specific form (MN).
@@ -64,7 +75,7 @@ type GssName interface {
 	// Returns:
 	//   - name: the canonical GssName. This must be released using GssName.Release()
 	//   - err: error if one occurred, otherwise nil
-	Canonicalize(GssMech) (GssName, error) // RFC 2743 § 2.4.14
+	Canonicalize(mech GssMech) (name GssName, err error) // RFC 2743 § 2.4.14
 
 	// Export creates an exported byte representation of a mechanism name (MN) that is the result of
 	// a call to CanonicalizeName() or Provider.AcceptSecContext().
@@ -76,7 +87,7 @@ type GssName interface {
 	// Returns:
 	//   - exp: the exported name representation
 	//   - err: error if one occurred, otherwise nil
-	Export() ([]byte, error) // RFC 2743 § 2.4.15
+	Export() (exp []byte, err error) // RFC 2743 § 2.4.15
 
 	// Duplicate implements GSS_Duplicate_name from RFC 2743 § 2.4.16.
 	// It creates a copy of the name that remains valid even if the source name is released.
@@ -84,7 +95,7 @@ type GssName interface {
 	// Returns:
 	//   - name: the duplicated name. This must be released using GssName.Release()
 	//   - err: error if one occurred, otherwise nil
-	Duplicate() (GssName, error) // RFC 2743 § 2.4.16
+	Duplicate() (name GssName, err error) // RFC 2743 § 2.4.16
 }
 
 // NOTE: if the order here changes also change
@@ -92,7 +103,7 @@ type GssName interface {
 
 const (
 	// Host-based name form (RFC 2743 § 4.1),      "service@host" or just "service"
-	GSS_NT_HOSTBASED_SERVICE GssNameType = iota
+	GSS_NT_HOSTBASED_SERVICE gssNameTypeImpl = iota
 
 	// User name form (RFC 2743 § 4.2),            "username" : named local user
 	GSS_NT_USER_NAME
@@ -136,7 +147,7 @@ const (
 	_GSS_NAME_TYPE_LAST
 )
 
-func (nt GssNameType) Oid() Oid {
+func (nt gssNameTypeImpl) Oid() Oid {
 	if nt >= _GSS_NAME_TYPE_LAST {
 		panic(ErrBadNameType)
 	}
@@ -144,7 +155,7 @@ func (nt GssNameType) Oid() Oid {
 	return nameTypes[nt].oid
 }
 
-func (nt GssNameType) OidString() string {
+func (nt gssNameTypeImpl) OidString() string {
 	if nt >= _GSS_NAME_TYPE_LAST {
 		panic(ErrBadNameType)
 	}
@@ -152,7 +163,7 @@ func (nt GssNameType) OidString() string {
 	return nameTypes[nt].oidString
 }
 
-func (nt GssNameType) String() string {
+func (nt gssNameTypeImpl) String() string {
 	if nt >= _GSS_NAME_TYPE_LAST {
 		panic(ErrBadNameType)
 	}
@@ -160,24 +171,32 @@ func (nt GssNameType) String() string {
 	return nameTypes[nt].name
 }
 
-// NameFromOid returns the name type associated with an OID, or an error if the OID is unknown.
+// NameTypeFromOid returns the name type associated with an OID.
+//
+// The standard implementation offers this function for use with the gssNameTypeImpl
+// internal type for a standard set of well known name types.
+//
+// If a provider needs to support a different name type, it can be added to gssNameTypeImpl via a pull
+// request to the go-gssapi repository. Alternatively, a new implementation of GssNameType can be
+// created for use by that GSSAPI implementation. Depending on the requirements, a replacement for
+// NameTypeFromOid may also need to be provided by the provider.
 // This function is provided to map a name OID to a name type.
 //
 // Parameters:
 //   - oid: the object identifier to look up
 //
 // Returns:
-//   - GssNameType: the corresponding name type
+//   - gssNameTypeImpl: the corresponding name type
 //   - error: ErrBadNameType if the OID is not recognized
-func NameFromOid(oid Oid) (GssNameType, error) {
+func NameTypeFromOid(oid Oid) (gssNameTypeImpl, error) {
 	for i, nt := range nameTypes {
 		if slices.Equal(nt.oid, oid) {
-			return GssNameType(i), nil
+			return gssNameTypeImpl(i), nil
 		}
 
 		for _, alt := range nt.altOids {
 			if slices.Equal(alt, oid) {
-				return GssNameType(i), nil
+				return gssNameTypeImpl(i), nil
 			}
 		}
 	}

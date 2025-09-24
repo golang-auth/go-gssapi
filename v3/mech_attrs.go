@@ -29,33 +29,71 @@ type gssMechAttrImpl int
 
 // Well known Mechanism attributes (RFC 5587)
 const (
+	// GSS_MA_MECH_CONCRETE - Indicates that a mechanism is neither a pseudo-mechanism nor a composite mechanism.
 	GSS_MA_MECH_CONCRETE gssMechAttrImpl = iota
+	// GSS_MA_MECH_PSEUDO - Indicates that a mechanism is a pseudo-mechanism.
 	GSS_MA_MECH_PSEUDO
+	// GSS_MA_MECH_COMPOSITE - Indicates that a mechanism is a composite of other mechanisms.
+	// This is reserved for a specification of stackable pseudo-mechanisms.
 	GSS_MA_MECH_COMPOSITE
+	// GSS_MA_MECH_NEGO - Indicates that a mechanism negotiates other mechanisms.
+	// eg. SPNEGO has this attribute.
 	GSS_MA_MECH_NEGO
+	// GSS_MA_MECH_GLUE - Indicates that the OID is not for a mechanism but for GSSAPI itself
 	GSS_MA_MECH_GLUE
+	// GSS_MA_NOT_MECH - Indicates that the OID is know, yet is is also known not to be the OID of
+	// any GSSAPI mechanism or of the GSSAPI itself.
 	GSS_MA_NOT_MECH
+	// GSS_MA_DEPRECATED - Indicates that a mechanism or its OID is deprecated and must not be
+	// used as a default mechanism.
 	GSS_MA_DEPRECATED
+	// GSS_MA_NOT_DFLT_MECH - Indicates that a mechanism or its OID must not be used as a default mechanism.
 	GSS_MA_NOT_DFLT_MECH
+	// GSS_MA_ITOK_FRAMED - Indicates that a mechanism's initial context tokens are properly framed
+	// as per RFC2743 § 3.1.
 	GSS_MA_ITOK_FRAMED
+	// GSS_MA_AUTH_INIT - Indicates support for authentication of initiator to acceptor.
 	GSS_MA_AUTH_INIT
+	// GSS_MA_AUTH_TARG - Indicates support for authentication of acceptor to initiator.
 	GSS_MA_AUTH_TARG
+	// GSS_MA_AUTH_INIT_INIT - Indicates support for authentication of initiator
+	// to acceptor.  Initial authentication refers to the use of passwords, or keys stored on tokens
+	// for authentication.  Whether a mechanism supports initial authentcation may depend on IETF
+	// consensus.
 	GSS_MA_AUTH_INIT_INIT
+	// GSS_MA_AUTH_TARG_INIT - Indicates support for initial authentication of acceptor to initiator.
 	GSS_MA_AUTH_TARG_INIT
+	// GSS_MA_AUTH_INIT_ANON - Indicates support for GSS_NT_ANONYMOUS as an initiator principal
+	// name.
 	GSS_MA_AUTH_INIT_ANON
+	// GSS_MA_AUTH_TARG_ANON - Indicates support for GSS_NT_ANONYMOUS as an target principal
+	// name.
 	GSS_MA_AUTH_TARG_ANON
+	// GSS_MA_DELEG_CRED - Indicates support for credential delegation.
 	GSS_MA_DELEG_CRED
+	// GSS_MA_INTEG_PROT - Indicates support for per-message integrity protection.
 	GSS_MA_INTEG_PROT
+	// GSS_MA_CONF_PROT - Indicates support for per-message confidentiality protection.
 	GSS_MA_CONF_PROT
+	// GSS_MA_MIC - Indicates support for Message Integrity Code (MIC) tokens.
 	GSS_MA_MIC
+	// GSS_MA_WRAP - Indicates support for wrap tokens.
 	GSS_MA_WRAP
+	// GSS_MA_PROT_READY - Indicates support for per-message protection prior to full context establishment.
 	GSS_MA_PROT_READY
+	// GSS_MA_REPLAY_DET - Indicates support for replay detection.
 	GSS_MA_REPLAY_DET
+	// GSS_MA_OOS_DET - Indicates support for out-of-sequence detection.
 	GSS_MA_OOS_DET
+	// GSS_MA_CBINDINGS - Indicates support for channel bindings.
 	GSS_MA_CBINDINGS
+	// GSS_MA_PFS - Indicates support for Perfect Forward Security.
 	GSS_MA_PFS
+	// GSS_MA_COMPRESS - Indicates support for compression of data inputs to gss_wrap().
 	GSS_MA_COMPRESS
+	// GSS_MA_CTX_TRANS - Indicates support for security context export/import.
 	GSS_MA_CTX_TRANS
+	// GSS_MA_NEGOEX_AND_SPNEGO - Indicates that the NegoEx mechanism should also be negotiable through SPNEGO.
 	GSS_MA_NEGOEX_AND_SPNEGO
 
 	_GSS_MA_LAST

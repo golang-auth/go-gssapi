@@ -147,8 +147,34 @@ func WithInitiatorLifetime(life time.Duration) InitSecContextOption {
 
 // WithChannelBinding supports the use of channel binding information when establishing the context,
 // corresponding to the input_chan_bindings parameter of GSS_Init_sec_context from the RFC.
-func WithChannelBinding(cb *ChannelBinding) InitSecContextOption {
+func WithInitiatorChannelBinding(cb *ChannelBinding) InitSecContextOption {
 	return func(o *InitSecContextOptions) {
+		o.ChannelBinding = cb
+	}
+}
+
+// AcceptSecContextOptions holds the optional parameters for accepting a security context.
+// These options correspond to the optional parameters of GSS_Accept_sec_context from RFC 2743 § 2.2.2.
+type AcceptSecContextOptions struct {
+	Credential     Credential      // Acceptor credential for context establishment
+	ChannelBinding *ChannelBinding // Channel binding information
+}
+
+// AcceptSecContextOption is a function type for configuring AcceptSecContext options.
+type AcceptSecContextOption func(o *AcceptSecContextOptions)
+
+// WithAcceptorCredential supports the use of a specifc credential when accepting a security context,
+// corresponding to the acceptor_cred_handle parameter to GSS_Accept_sec_context from the RFC.
+func WithAcceptorCredential(cred Credential) AcceptSecContextOption {
+	return func(o *AcceptSecContextOptions) {
+		o.Credential = cred
+	}
+}
+
+// WithAcceptorChannelBinding supports the use of channel binding information when accepting a security context,
+// corresponding to the chan_bindings parameter to GSS_Accept_sec_context from the RFC.
+func WithAcceptorChannelBinding(cb *ChannelBinding) AcceptSecContextOption {
+	return func(o *AcceptSecContextOptions) {
 		o.ChannelBinding = cb
 	}
 }
@@ -176,6 +202,7 @@ type Provider interface {
 	// Returns:
 	//   A GSSAPI credential suitable for InitSecContext or AcceptSecContext, based on the usage.
 	AcquireCredential(name GssName, mechs []GssMech, usage CredUsage, lifetime time.Duration) (Credential, error) // RFC 2743 § 2.1.1
+
 	// InitSecContext corresponds to the GSS_Init_sec_context function from RFC 2743 § 2.2.1.
 	// Parameters:
 	//   name: The GSSAPI Internal Name of the target.
@@ -188,8 +215,7 @@ type Provider interface {
 
 	// AcceptSecContext corresponds to the GSS_Accept_sec_context function from RFC 2743 § 2.2.2.
 	// Parameters:
-	//   cred: The GSSAPI acceptor credential, or nil to use the default.
-	//   cb:   Channel bindings information, or nil for no channel bindings
+	//   opts: Optional context establishment parameters, see [AcceptSecContextOption].
 	// Returns:
 	//   A GSSAPI security context and an optional token to send back to the initiator
 	//   for consumption by GSS_Init_sec_context ([SecContext.Continue()] in the Go implementation)
@@ -200,7 +226,7 @@ type Provider interface {
 	//
 	//   A partially established context may allow the creation of protected messages.
 	//   Check the [SecContextInfo.ProtectionReady] flag by calling [SecContext.Inquire()].
-	AcceptSecContext(cred Credential, cb *ChannelBinding) (SecContext, error) // RFC 2743 § 2.2.2
+	AcceptSecContext(opts ...AcceptSecContextOption) (SecContext, error) // RFC 2743 § 2.2.2
 
 	// ImportSecContext corresponds to the GSS_Import_sec_context function from RFC 2743 § 2.2.9
 	// Parameters:

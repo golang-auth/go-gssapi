@@ -13,6 +13,10 @@ type someProvider struct {
 	name string
 }
 
+func (p someProvider) Name() string {
+	return p.name
+}
+
 func (someProvider) ImportName(name string, nameType GssNameType) (GssName, error) {
 	return nil, nil
 }
@@ -48,28 +52,34 @@ func (someProvider) HasExtension(e GssapiExtension) bool {
 func TestRegister(t *testing.T) {
 	assert := assert.New(t)
 
-	registry.libs = make(map[string]ProviderFactory)
+	registry.libs = make(map[string]ProviderConstructor)
 
 	assert.Equal(0, len(registry.libs))
 
-	factory := func() Provider {
-		return someProvider{name: "TEST"}
+	constructor := func() (Provider, error) {
+		return someProvider{name: "TEST"}, nil
 	}
 
-	RegisterProvider("test", factory)
+	RegisterProvider("test", constructor)
 	assert.Equal(1, len(registry.libs))
 	f, ok := registry.libs["test"]
 	assert.True(ok)
 	assert.NotNil(f)
 
-	p := NewProvider("test")
+	p, err := NewProvider("test")
+	assert.NoError(err)
 	assert.NotNil(p)
 	sp, ok := p.(someProvider)
 	assert.True(ok)
 	assert.Equal("TEST", sp.name)
 
-	assert.Panics(func() { NewProvider("") })
-	assert.Panics(func() { NewProvider("xyz") })
+	p, err = NewProvider("xyz")
+	assert.Error(err)
+	assert.Nil(p)
+
+	assert.NotPanics(func() { MustNewProvider("test") })
+	assert.Panics(func() { MustNewProvider("") })
+	assert.Panics(func() { MustNewProvider("xyz") })
 }
 
 type someCredential struct{}

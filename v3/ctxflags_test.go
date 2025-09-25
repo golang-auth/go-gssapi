@@ -19,7 +19,7 @@ func TestFlagName(t *testing.T) {
 	assert.Equal(t, "Delegation", flagName(ContextFlagDeleg))
 	assert.Equal(t, "Integrity", flagName(ContextFlagInteg))
 	assert.Equal(t, "Mutual authentication", flagName(ContextFlagMutual))
-	assert.Equal(t, "Channel Bindings", flagName(ContextFlagChannelBound))
+	assert.Equal(t, "Channel Bindings required/present", flagName(ContextFlagChannelBound))
 	assert.Equal(t, "Anonymous", flagName(ContextFlagAnon))
 	assert.Equal(t, "Extended errors", flagName(ContextFlagExtendedError))
 }

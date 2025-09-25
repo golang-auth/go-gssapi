@@ -3,22 +3,25 @@
 package gssapi
 
 import (
+	"errors"
 	"sync"
 	"time"
 )
 
+var ErrProviderNotFound = errors.New("provider not found")
+
 var registry struct {
 	sync.Mutex
-	libs map[string]ProviderFactory
+	libs map[string]ProviderConstructor
 }
 
 func init() {
-	registry.libs = make(map[string]ProviderFactory)
+	registry.libs = make(map[string]ProviderConstructor)
 }
 
-// ProviderFactory defines the function signature passed to RegisterProvider, used
+// ProviderConstructor defines the function signature passed to RegisterProvider, used
 // by the registration interface to create new instances of a provider.
-type ProviderFactory func() Provider
+type ProviderConstructor func() (Provider, error)
 
 // RegisterProvider associates the supplied provider factory with the unique
 // name for the provider. If a provider with name is already registered, the new
@@ -34,7 +37,7 @@ type ProviderFactory func() Provider
 //   - f: function that can be used to instantiate the provider
 //
 // The function always succeeds.
-func RegisterProvider(name string, f ProviderFactory) {
+func RegisterProvider(name string, f ProviderConstructor) {
 	registry.Lock()
 	defer registry.Unlock()
 
@@ -53,22 +56,43 @@ func RegisterProvider(name string, f ProviderFactory) {
 //
 // Returns:
 //   - p: provider instance
-//
-// Panics if the provider name is not registered.
-func NewProvider(name string) Provider {
+//   - err: error if one occurred, otherwise nil
+func NewProvider(name string) (p Provider, err error) {
 	registry.Lock()
 	defer registry.Unlock()
 
-	if name == "" {
-		panic("GSSAPI library name not set")
+	f, ok := registry.libs[name]
+	if !ok {
+		return nil, ErrProviderNotFound
 	}
+
+	return f()
+}
+
+// MustNewProvider wraps NewProvider in a panic.
+//
+// Parameters:
+//   - name: unique name of a previously registered provider
+//
+// Returns:
+//   - provider instance
+//
+// Panics if the provider name is not registeredor its constructor returns an error.
+func MustNewProvider(name string) Provider {
+	registry.Lock()
+	defer registry.Unlock()
 
 	f, ok := registry.libs[name]
 	if !ok {
 		panic("GSSAPI library not found: " + name)
 	}
 
-	return f()
+	p, err := f()
+	if err != nil {
+		panic(err)
+	}
+
+	return p
 }
 
 // QoP represents quality of protection values used in various security context operations
@@ -132,6 +156,9 @@ func WithChannelBinding(cb *ChannelBinding) InitSecContextOption {
 // Provider is the interface that defines the top level GSSAPI functions that
 // create name, credential and security contexts
 type Provider interface {
+	// Name returns the unique name of the provider.
+	Name() string
+
 	// ImportName corresponds to the GSS_Import_name function from RFC 2743 § 2.4.5.
 	// Parameters:
 	//   name:     A name-type specific octet-string

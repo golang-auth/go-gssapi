@@ -262,3 +262,33 @@ type ProviderExtRFC5587 interface {
 	// The three parameters represent desired attributes, except attributes, and critical attributes respectively.
 	IndicateMechsByAttrs([]GssMechAttr, []GssMechAttr, []GssMechAttr) ([]GssMech, error) // RFC 5587 § 3.4.2
 }
+
+// ProviderExtRFC5801 extends the Provider interface with RFC 5801 mechanism functionality.
+// Providers implementing this interface can be used by GS2 SASL mechanisms.  Support
+// for RFC 5801 can be determined with a call to `HasExtension(HasExtRFC5801)`.
+type ProviderExtRFC5801 interface {
+	Provider
+	// InquireSASLNameForMech identified the GSSAPI mechanism to which a SASL mechanism refers
+	// See RFC 5801 § 10
+	InquireSASLNameForMech(m GssMech) (SASLMechInfo, error)
+	// InquireMechForSASLName identifies the SASL mechanism to which a GSSAPI mechanism refers
+	// See RFC 5801 § 11
+	InquireMechForSASLName(saslName string) (GssMech, error)
+}
+
+type SASLMechInfo struct {
+	SASLName        string
+	MechName        string
+	MechDescription string
+}
+
+type ProviderExtGGF interface {
+	Provider
+	ImportCredential(b []byte) (Credential, error) // GFD.24 § 2.1.2
+}
+
+// Acquire credentials with password extension
+type ProviderExtCredPassword interface {
+	Provider
+	AcquireCredentialWithPassword(name GssName, password string, lifetime time.Duration, mechs []GssMech, usage CredUsage) (Credential, error)
+}

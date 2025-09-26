@@ -182,3 +182,15 @@ type SecContext interface {
 	//   - err: Error if one occurred, otherwise nil
 	Continue([]byte) (tokOut []byte, err error)
 }
+
+type SecContextExtGGF interface {
+	SecContext
+	InquireByOid(oid Oid) (data [][]byte, err error) // GFD.24 § 2.3.1
+	SetOption(option Oid, value []byte) error        // GFD.24 § 2.4.1
+}
+
+type SecContextExtRFC4121 interface {
+	SecContext
+	WrapAEAD([]byte, []byte, bool, QoP) (msgOut []byte, confState bool, err error) // RFC 4121 § 4.1
+	UnwrapAEAD([]byte, []byte) (msgOut []byte, confState bool, err error)          // RFC 4121 § 4.2
+}

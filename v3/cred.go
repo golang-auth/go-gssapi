@@ -100,3 +100,37 @@ type Credential interface {
 	//   - err: error if one occurred, otherwise nil
 	InquireByMech(mech GssMech) (info *CredInfo, err error) // RFC 2743 § 2.1.5
 }
+
+// CredentialExtRFC4178  extends the Credential interface to support the APIs defined in RFC 4178: GSSAPI Negotiation mechanism.
+type CredentialExtRFC4178 interface {
+	Credential
+	SetNegotiationMechs([]GssMech) error     // RFC 4178 § B.1
+	GetNegotiationMechs() ([]GssMech, error) // RFC 4178 § B.2
+}
+
+// CredentialExtRFC5588 extends the Credential interface to support the APIs defined in RFC 5588: GSSAPI Negotiation mechanismStoring delegated credentials.
+type CredentialExtRFC5588 interface {
+	Credential
+	StoreCredential(usage CredUsage, mech GssMech, overwrite bool, makeDefault bool) ([]GssMech, CredUsage, error) // RFC 5588 § B.1
+}
+
+// CredentialExtGGF extends the Credential interface to support the APIs defined in GFD.24: GGF extensions.
+type CredentialExtGGF interface {
+	Credential
+	Export() ([]byte, error)                         // GFD.24 § 2.1.1
+	InquireByOid(oid Oid) (data [][]byte, err error) // GFD.24 § 2.3.2
+
+}
+
+// CredentialExtS4U extends the Credential interface to support the APIs defined in S4U extensions.
+type CredentialExtS4U interface {
+	Credential
+	AquireImpersonateName(name GssName, mechs []GssMech, usage CredUsage, lifetime time.Duration) (Credential, error)
+	AddImpersonateName(impersonateCred Credential, name GssName, mech GssMech, usage CredUsage, initiatorLifetime time.Duration, acceptorLifetime time.Duration) (Credential, error)
+}
+
+// Acquire credentials with password extension
+type CredentialExtCredPassword interface {
+	Credential
+	AddWithPassword(name GssName, password string, mech GssMech, usage CredUsage, initiatorLifetime time.Duration, acceptorLifetime time.Duration) (Credential, error)
+}

@@ -6,15 +6,22 @@ package gssapi
 
 // SecContextInfo contains information about a security context returned by the Inquire method.
 type SecContextInfo struct {
-	InitiatorName    GssName     // The initiator name (MN - mechanism name)
-	AcceptorName     GssName     // The acceptor name (MN - mechanism name)
-	Mech             GssMech     // The mechanism used by the context
-	Flags            ContextFlag // The protection flags available
-	ExpiresAt        GssLifetime // Context expiration information
-	LocallyInitiated bool        // True if the caller initiated the security context
-	FullyEstablished bool        // True once the context is fully established
-	ProtectionReady  bool        // True when per-message methods can be used to protect messages
-	Transferrable    bool        // True if the context can be transferred to another process
+	SecContextInfoPartial
+	AcceptorName        GssName     // The acceptor name (MN - mechanism name)
+}
+
+// SecContextInfoPartial contains information about a security context that is returned during the
+// context initialization process and from a call to Inquire.
+type SecContextInfoPartial struct {
+	InitiatorName       GssName     // The initiator name (MN - mechanism name)
+	Mech                GssMech     // The mechanism used by the context
+	Flags               ContextFlag // The protection flags available
+	ExpiresAt           GssLifetime // Context expiration information
+	LocallyInitiated    bool        // True if the caller initiated the security context
+	FullyEstablished    bool        // True once the context is fully established
+	ProtectionReady     bool        // True when per-message methods can be used to protect messages
+	Transferrable       bool        // True if the context can be transferred to another process
+	DelegatedCredential Credential  // The credential that was delegated to the context, if Flags.ContextFlagDeleg is set, and LocallyInitiated is not set
 }
 
 // SecContext represents a GSSAPI security context. A security context is created through the
@@ -164,7 +171,7 @@ type SecContext interface {
 	// GSS_S_CONTINUE_NEEDED status from GSS_Init_sec_context or GSS_Accept_sec_context.
 	//
 	// Returns:
-	//   - Whether more message exchanges are required
+	//   - Whether more message exchanges are required to complete the context initialization.
 	ContinueNeeded() bool
 
 	// Continue is used by initiators and acceptors during the context-initialization loop
@@ -174,13 +181,23 @@ type SecContext interface {
 	// The caller should check the result of ContinueNeeded to determine whether the initialization
 	// loop has completed.
 	//
+	// Note:
+	//   Not all members of the SecContextInfoPartial struct are guaranteed to be set during the
+	//   context establishment process, and the values may change as additional facilities are confirmed.
+	//
+	//   It may not be obvious why a caller should make use of the SecContextInfoPartial struct,
+	//   rather than calling Inquire().  The latter will fail if the context has expired and so
+	//   represents a race condition for callers that use GSSAPI purely for authentication purposes.
+	//
 	// Parameters:
 	//   - tokIn: Context initialization token received from the peer
 	//
 	// Returns:
 	//   - tokOut: New token to send to the peer; zero length if no token should be sent
+	//   - info: Information about the security context as established so far
+	//           No members of the SecContextInfoPartial struct should be freed by the caller.
 	//   - err: Error if one occurred, otherwise nil
-	Continue([]byte) (tokOut []byte, err error)
+	Continue([]byte) (tokOut []byte, info SecContextInfoPartial, err error)
 }
 
 type SecContextExtGGF interface {

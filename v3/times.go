@@ -26,3 +26,15 @@ type GssLifetime struct {
 	Status    GssLifetimeStatus
 	ExpiresAt time.Time
 }
+
+func MakeGssLifetime(lifetime time.Duration) *GssLifetime {
+	status := GssLifetimeAvailable
+	if lifetime == 0 {
+		status = GssLifetimeExpired
+	}
+
+	return &GssLifetime{
+		Status:    status,
+		ExpiresAt: time.Now().Add(lifetime),
+	}
+}

@@ -4,8 +4,6 @@ package gssapi
 
 // GSSAPI Credential Management, RFC 2743 § 2.1
 
-import "time"
-
 // CredUsage defines the intended usage for credentials as specified in RFC 2743 § 2.1.1.
 type CredUsage int
 
@@ -61,9 +59,6 @@ type Credential interface {
 	// Add adds a credential element to the Credential. This method implements the GSS_Add_cred call
 	// described in RFC 2743 § 2.1.4.
 	//
-	// The RFC describes a mode where a new credential handle can be returned instead of modifying the
-	// existing handle. The Go bindings define the addition of credentials to the existing Credential only.
-	//
 	// The RFC details a set of outputs related to the added credential. These are not returned by the Go
 	// bindings; callers should use Inquire() or InquireByMech() instead.
 	//
@@ -73,13 +68,15 @@ type Credential interface {
 	//   - mech: the mechanism to add
 	//   - usage: the desired credential usage
 	//   - initiatorLifetime: the desired lifetime of the initiator credential if usage is
-	//     CredUsageInitiateOnly or CredUsageInitiateAndAccept, or the zero value for a default value
+	//     CredUsageInitiateOnly or CredUsageInitiateAndAccept, or nil for a default value
 	//   - acceptorLifetime: the desired lifetime of the acceptor credential if usage is
-	//     CredUsageAcceptOnly or CredUsageInitiateAndAccept, or the zero value for a default value
+	//     CredUsageAcceptOnly or CredUsageInitiateAndAccept, or nil for a default value
+	//   - mutate: if true, the existing credential is mutated, otherwise a new credential is returned
 	//
 	// Returns:
-	//   - error if one occurred, otherwise nil
-	Add(name GssName, mech GssMech, usage CredUsage, initiatorLifetime time.Duration, acceptorLifetime time.Duration) error // RFC 2743 § 2.1.4
+	//   - cred: the credential with the added element
+	//   - err: error if one occurred, otherwise nil
+	Add(name GssName, mech GssMech, usage CredUsage, initiatorLifetime *GssLifetime, acceptorLifetime *GssLifetime, mutate bool) (cred Credential, err error) // RFC 2743 § 2.1.4
 
 	// InquireByMech returns information about the credential element related to mech, implementing the
 	// GSS_Inquire_cred_by_mech call from RFC 2743 § 2.1.5. This call is a finer-grained,
@@ -125,12 +122,12 @@ type CredentialExtGGF interface {
 // CredentialExtS4U extends the Credential interface to support the APIs defined in S4U extensions.
 type CredentialExtS4U interface {
 	Credential
-	AquireImpersonateName(name GssName, mechs []GssMech, usage CredUsage, lifetime time.Duration) (Credential, error)
-	AddImpersonateName(impersonateCred Credential, name GssName, mech GssMech, usage CredUsage, initiatorLifetime time.Duration, acceptorLifetime time.Duration) (Credential, error)
+	AquireImpersonateName(name GssName, mechs []GssMech, usage CredUsage, lifetime GssLifetime) (Credential, error)
+	AddImpersonateName(impersonateCred Credential, name GssName, mech GssMech, usage CredUsage, initiatorLifetime GssLifetime, acceptorLifetime GssLifetime) (Credential, error)
 }
 
 // Acquire credentials with password extension
 type CredentialExtCredPassword interface {
 	Credential
-	AddWithPassword(name GssName, password string, mech GssMech, usage CredUsage, initiatorLifetime time.Duration, acceptorLifetime time.Duration) (Credential, error)
+	AddWithPassword(name GssName, password string, mech GssMech, usage CredUsage, initiatorLifetime GssLifetime, acceptorLifetime GssLifetime) (Credential, error)
 }

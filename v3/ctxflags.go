@@ -76,7 +76,7 @@ func flagName(f ContextFlag) string {
 	return "Unknown"
 }
 
-// Returns a string describing the enabled flags
+// String returns a string describing the enabled flags
 func (f ContextFlag) String() string {
 	var names []string
 	for _, flag := range FlagList(f) {

@@ -2,56 +2,79 @@ name: Checks
 
 on:
   push:
+    branches:
+      - v3
   pull_request:
+    branches:
+      - v3
 
 permissions:
   contents: read
     
 jobs:
-
   consistency-checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-  
-      - name: Set up Go 1.22
-        uses: actions/setup-go@v5
-        with:
-          go-version: 1.22.x
+    - uses: actions/checkout@v4
 
-      - name: Code format check
-        run: ./.github/scripts/gofmt
+    - name: Set up Go 1.25
+      uses: actions/setup-go@v5
+      with:
+          go-version: 1.25.x
 
-      - uses: dominikh/staticcheck-action@v1.3.1
-        with:
-          working-directory: v3
+    - name: OS details
+      run: |
+          uname -a
+          if [ -e /etc/os-release ]; then cat /etc/os-release; fi
+
+    - name: Code format check
+      run: ./.github/scripts/gofmt
+
+    - name: golangci-lint
+      uses: golangci/golangci-lint-action@v8
+      with:
+        version: latest
+        working-directory: v3
 
   basic-tests:
     name: Basic tests
+    timeout-minutes: 60
+    needs: consistency-checks
     strategy:
+      fail-fast: false
+      max-parallel: 4
       matrix:
-#        os: ['windows-latest', 'ubuntu-latest']
-        os: ['ubuntu-latest']
-        go-version: ['1.21.x', '1.22.x' ]
+        os: ['ubuntu-latest', 'macos-latest']
+        go-version: ['1.24.x', '1.25.x' ]
 
     runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+  
+      - name: Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+  
+      - name: OS details
+        run: |
+            echo This is Github OS ${{ runner.os }}
+            uname -a
+            if [ -e /etc/os-release ]; then cat /etc/os-release; fi
 
-    - name: Set up Go ${{ matrix.go-version }}
-      uses: actions/setup-go@v5
-      with:
-        go-version: ${{ matrix.go-version }}
+      - name: Generate test includes
+        run: |
+          echo pkgs=$(cd v3 && go list ./... | grep -v /examples/) >> "$GITHUB_ENV"
 
-    - name: Generate test includes
-      run: |
-        echo pkgs=$(cd v3 && go list ./... | grep -v /examples/) >> "$GITHUB_ENV"
+      - name: Run tests
+        run: |
+          pushd v3
+          go test $pkgs -count 100 -coverprofile=../cover.out -covermode=atomic
+          popd
 
-    - name: Run tests
-      run: pushd v3 ; go test -v $pkgs -count 100 -coverprofile=../cover.out -covermode=atomic; popd
-
-    - name: Check test coverage
-      uses: jake-scott/go-test-coverage@v1.0.0
-      with:
-        config: ./.testcoverage.yml
+      - name: Check test coverage
+        if: ${{ runner.os == 'Linux' }}
+        uses: jake-scott/go-test-coverage@v1.0.0
+        with:
+          config: ./.testcoverage.yml

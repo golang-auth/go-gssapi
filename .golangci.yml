@@ -1,0 +1,11 @@
+version: "2"
+
+linters:
+  settings:
+    staticcheck:
+      checks:
+        - all
+        # Apply De Morgan's law.
+        # https://staticcheck.dev/docs/checks/#QF1001
+        - -QF1001
+        - -ST1003

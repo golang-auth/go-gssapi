@@ -98,19 +98,19 @@ var ErrBadMechAttr = errors.New("an unsupported mechanism attribute was requeste
 // These are returned by InfoStatus.Unwrap() and FatalStatus.Unwrap() and can be used with Go's
 // standard error handling mechanisms like errors.Is().
 
-//lint:ignore ST1012 these aren't actually errors
+//nolint:staticcheck // ST1012 these aren't actually errors
 var InfoContinueNeeded = errors.New("the routine must be called again to complete its function")
 
-//lint:ignore ST1012 these aren't actually errors
+//nolint:staticcheck // ST1012 these aren't actually errors
 var InfoDuplicateToken = errors.New(`the token was a duplicate of an earlier token`)
 
-//lint:ignore ST1012 these aren't actually errors
+//nolint:staticcheck // ST1012 these aren't actually errors
 var InfoOldToken = errors.New("the token's validity period has expired")
 
-//lint:ignore ST1012 these aren't actually errors
+//nolint:staticcheck // ST1012 these aren't actually errors
 var InfoUnseqToken = errors.New("a later token has already been processed")
 
-//lint:ignore ST1012 these aren't actually errors
+//nolint:staticcheck // ST1012 these aren't actually errors
 var InfoGapToken = errors.New("an expected per-message token was not received")
 
 func (s FatalStatus) Fatal() error {

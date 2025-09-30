@@ -21,16 +21,16 @@ func (someProvider) ImportName(name string, nameType GssNameType) (GssName, erro
 	return nil, nil
 }
 
-func (someProvider) AcquireCredential(name GssName, mechs []GssMech, usage CredUsage, lifetime time.Duration) (Credential, error) {
+func (someProvider) AcquireCredential(name GssName, mechs []GssMech, usage CredUsage, lifetime *GssLifetime) (Credential, error) {
 	return nil, nil
 }
 
-func (someProvider) InitSecContext(name GssName, opts ...InitSecContextOption) (SecContext, error) {
-	return nil, nil
+func (someProvider) InitSecContext(name GssName, opts ...InitSecContextOption) (SecContext, SecContextInfoPartial, error) {
+	return nil, SecContextInfoPartial{}, nil
 }
 
-func (someProvider) AcceptSecContext(opts ...AcceptSecContextOption) (SecContext, error) {
-	return nil, nil
+func (someProvider) AcceptSecContext(opts ...AcceptSecContextOption) (SecContext, SecContextInfoPartial, error) {
+	return nil, SecContextInfoPartial{}, nil
 }
 
 func (someProvider) ImportSecContext(b []byte) (SecContext, error) {
@@ -92,8 +92,8 @@ func (someCredential) Inquire() (*CredInfo, error) {
 	return nil, nil
 }
 
-func (someCredential) Add(name GssName, mech GssMech, usage CredUsage, initiatorLifetime time.Duration, acceptorLifetime time.Duration) error {
-	return nil
+func (c someCredential) Add(name GssName, mech GssMech, usage CredUsage, initiatorLifetime *GssLifetime, acceptorLifetime *GssLifetime, mutate bool) (Credential, error) {
+	return c, nil
 }
 
 func (someCredential) InquireByMech(mech GssMech) (*CredInfo, error) {

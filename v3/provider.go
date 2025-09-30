@@ -145,7 +145,7 @@ func WithInitiatorLifetime(life time.Duration) InitSecContextOption {
 	}
 }
 
-// WithChannelBinding supports the use of channel binding information when establishing the context,
+// WithInitiatorChannelBinding supports the use of channel binding information when establishing the context,
 // corresponding to the input_chan_bindings parameter of GSS_Init_sec_context from the RFC.
 func WithInitiatorChannelBinding(cb *ChannelBinding) InitSecContextOption {
 	return func(o *InitSecContextOptions) {
@@ -201,7 +201,7 @@ type Provider interface {
 	//   lifetime: Desired credential lifetime duration, or zero (0) for the default.
 	// Returns:
 	//   A GSSAPI credential suitable for InitSecContext or AcceptSecContext, based on the usage.
-	AcquireCredential(name GssName, mechs []GssMech, usage CredUsage, lifetime time.Duration) (Credential, error) // RFC 2743 § 2.1.1
+	AcquireCredential(name GssName, mechs []GssMech, usage CredUsage, lifetime *GssLifetime) (Credential, error) // RFC 2743 § 2.1.1
 
 	// InitSecContext corresponds to the GSS_Init_sec_context function from RFC 2743 § 2.2.1.
 	// Parameters:
@@ -211,7 +211,7 @@ type Provider interface {
 	//   A uninitialized GSSAPI security context ready for exchanging tokens with the peer when
 	//   the first call to [Continue()] with an empty input token is made.  [ContinueNeeded()] will true
 	//   when this call returns successfully.
-	InitSecContext(name GssName, opts ...InitSecContextOption) (SecContext, error) // RFC 2743 § 2.2.1
+	InitSecContext(name GssName, opts ...InitSecContextOption) (SecContext, SecContextInfoPartial, error) // RFC 2743 § 2.2.1
 
 	// AcceptSecContext corresponds to the GSS_Accept_sec_context function from RFC 2743 § 2.2.2.
 	// Parameters:
@@ -226,7 +226,7 @@ type Provider interface {
 	//
 	//   A partially established context may allow the creation of protected messages.
 	//   Check the [SecContextInfo.ProtectionReady] flag by calling [SecContext.Inquire()].
-	AcceptSecContext(opts ...AcceptSecContextOption) (SecContext, error) // RFC 2743 § 2.2.2
+	AcceptSecContext(opts ...AcceptSecContextOption) (SecContext, SecContextInfoPartial, error) // RFC 2743 § 2.2.2
 
 	// ImportSecContext corresponds to the GSS_Import_sec_context function from RFC 2743 § 2.2.9
 	// Parameters:
@@ -287,8 +287,14 @@ type ProviderExtGGF interface {
 	ImportCredential(b []byte) (Credential, error) // GFD.24 § 2.1.2
 }
 
-// Acquire credentials with password extension
+// ProviderExtCredPassword : Acquire credentials with password extension
 type ProviderExtCredPassword interface {
 	Provider
 	AcquireCredentialWithPassword(name GssName, password string, lifetime time.Duration, mechs []GssMech, usage CredUsage) (Credential, error)
+}
+
+type ProviderExtKrb5Identity interface {
+	Provider
+	RegisterAcceptorIdentity(identity string) error
+	SetCCacheName(ccacheName string) error
 }

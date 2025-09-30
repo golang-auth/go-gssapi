@@ -6,15 +6,16 @@ package gssapi
 
 // SecContextInfo contains information about a security context returned by the Inquire method.
 type SecContextInfo struct {
-	InitiatorName    GssName     // The initiator name (MN - mechanism name)
-	AcceptorName     GssName     // The acceptor name (MN - mechanism name)
-	Mech             GssMech     // The mechanism used by the context
-	Flags            ContextFlag // The protection flags available
-	ExpiresAt        GssLifetime // Context expiration information
-	LocallyInitiated bool        // True if the caller initiated the security context
-	FullyEstablished bool        // True once the context is fully established
-	ProtectionReady  bool        // True when per-message methods can be used to protect messages
-	Transferrable    bool        // True if the context can be transferred to another process
+	InitiatorName       GssName     // The initiator name (MN - mechanism name)
+	AcceptorName        GssName     // The acceptor name (MN - mechanism name)
+	Mech                GssMech     // The mechanism used by the context
+	Flags               ContextFlag // The protection flags available
+	ExpiresAt           GssLifetime // Context expiration information
+	LocallyInitiated    bool        // True if the caller initiated the security context
+	FullyEstablished    bool        // True once the context is fully established
+	ProtectionReady     bool        // True when per-message methods can be used to protect messages
+	Transferrable       bool        // True if the context can be transferred to another process
+	DelegatedCredential Credential  // The credential that was delegated to the context, if Flags.ContextFlagDeleg and LocallyInitiated is not set
 }
 
 // SecContext represents a GSSAPI security context. A security context is created through the

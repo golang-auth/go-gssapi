@@ -21,7 +21,7 @@ func (someProvider) ImportName(name string, nameType GssNameType) (GssName, erro
 	return nil, nil
 }
 
-func (someProvider) AcquireCredential(name GssName, mechs []GssMech, usage CredUsage, lifetime time.Duration) (Credential, error) {
+func (someProvider) AcquireCredential(name GssName, mechs []GssMech, usage CredUsage, lifetime *GssLifetime) (Credential, error) {
 	return nil, nil
 }
 
@@ -92,7 +92,7 @@ func (someCredential) Inquire() (*CredInfo, error) {
 	return nil, nil
 }
 
-func (someCredential) Add(name GssName, mech GssMech, usage CredUsage, initiatorLifetime time.Duration, acceptorLifetime time.Duration) error {
+func (someCredential) Add(name GssName, mech GssMech, usage CredUsage, initiatorLifetime *GssLifetime, acceptorLifetime *GssLifetime) error {
 	return nil
 }
 

@@ -201,7 +201,7 @@ type Provider interface {
 	//   lifetime: Desired credential lifetime duration, or zero (0) for the default.
 	// Returns:
 	//   A GSSAPI credential suitable for InitSecContext or AcceptSecContext, based on the usage.
-	AcquireCredential(name GssName, mechs []GssMech, usage CredUsage, lifetime time.Duration) (Credential, error) // RFC 2743 § 2.1.1
+	AcquireCredential(name GssName, mechs []GssMech, usage CredUsage, lifetime *GssLifetime) (Credential, error) // RFC 2743 § 2.1.1
 
 	// InitSecContext corresponds to the GSS_Init_sec_context function from RFC 2743 § 2.2.1.
 	// Parameters:

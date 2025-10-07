@@ -4,8 +4,6 @@ package gssapi
 
 // GSSAPI Credential Management, RFC 2743 § 2.1
 
-import "time"
-
 // CredUsage defines the intended usage for credentials as specified in RFC 2743 § 2.1.1.
 type CredUsage int
 
@@ -73,13 +71,13 @@ type Credential interface {
 	//   - mech: the mechanism to add
 	//   - usage: the desired credential usage
 	//   - initiatorLifetime: the desired lifetime of the initiator credential if usage is
-	//     CredUsageInitiateOnly or CredUsageInitiateAndAccept, or the zero value for a default value
+	//     CredUsageInitiateOnly or CredUsageInitiateAndAccept, or nil for a default value
 	//   - acceptorLifetime: the desired lifetime of the acceptor credential if usage is
-	//     CredUsageAcceptOnly or CredUsageInitiateAndAccept, or the zero value for a default value
+	//     CredUsageAcceptOnly or CredUsageInitiateAndAccept, or nil for a default value
 	//
 	// Returns:
 	//   - error if one occurred, otherwise nil
-	Add(name GssName, mech GssMech, usage CredUsage, initiatorLifetime time.Duration, acceptorLifetime time.Duration) error // RFC 2743 § 2.1.4
+	Add(name GssName, mech GssMech, usage CredUsage, initiatorLifetime *GssLifetime, acceptorLifetime *GssLifetime) error // RFC 2743 § 2.1.4
 
 	// InquireByMech returns information about the credential element related to mech, implementing the
 	// GSS_Inquire_cred_by_mech call from RFC 2743 § 2.1.5. This call is a finer-grained,
@@ -125,12 +123,12 @@ type CredentialExtGGF interface {
 // CredentialExtS4U extends the Credential interface to support the APIs defined in S4U extensions.
 type CredentialExtS4U interface {
 	Credential
-	AquireImpersonateName(name GssName, mechs []GssMech, usage CredUsage, lifetime time.Duration) (Credential, error)
-	AddImpersonateName(impersonateCred Credential, name GssName, mech GssMech, usage CredUsage, initiatorLifetime time.Duration, acceptorLifetime time.Duration) (Credential, error)
+	AquireImpersonateName(name GssName, mechs []GssMech, usage CredUsage, lifetime GssLifetime) (Credential, error)
+	AddImpersonateName(impersonateCred Credential, name GssName, mech GssMech, usage CredUsage, initiatorLifetime GssLifetime, acceptorLifetime GssLifetime) (Credential, error)
 }
 
 // Acquire credentials with password extension
 type CredentialExtCredPassword interface {
 	Credential
-	AddWithPassword(name GssName, password string, mech GssMech, usage CredUsage, initiatorLifetime time.Duration, acceptorLifetime time.Duration) (Credential, error)
+	AddWithPassword(name GssName, password string, mech GssMech, usage CredUsage, initiatorLifetime GssLifetime, acceptorLifetime GssLifetime) (Credential, error)
 }

@@ -18,7 +18,6 @@ var namesToOids = []struct {
 	oid     string
 	altOids []string
 }{
-
 	// the alternate OIDs are the old (pre RFC) OID and incorrect OID shipped with Windows 2000
 	// (see https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-spng/211417c4-11ef-46c0-a8fb-f178a51c2088)
 	{"GSS_MECH_KRB5", "1.2.840.113554.1.2.2", []string{"1.3.6.1.5.2", "1.2.840.48018.1.2.2"}},

@@ -92,8 +92,8 @@ func (someCredential) Inquire() (*CredInfo, error) {
 	return nil, nil
 }
 
-func (someCredential) Add(name GssName, mech GssMech, usage CredUsage, initiatorLifetime *GssLifetime, acceptorLifetime *GssLifetime) error {
-	return nil
+func (c someCredential) Add(name GssName, mech GssMech, usage CredUsage, initiatorLifetime *GssLifetime, acceptorLifetime *GssLifetime, mutate bool) (Credential, error) {
+	return c, nil
 }
 
 func (someCredential) InquireByMech(mech GssMech) (*CredInfo, error) {

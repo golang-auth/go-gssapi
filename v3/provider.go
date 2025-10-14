@@ -292,3 +292,9 @@ type ProviderExtCredPassword interface {
 	Provider
 	AcquireCredentialWithPassword(name GssName, password string, lifetime time.Duration, mechs []GssMech, usage CredUsage) (Credential, error)
 }
+
+type ProviderExtKrb5Identity interface {
+	Provider
+	RegisterAcceptorIdentity(identity string) error
+	SetCCacheName(ccacheName string) error
+}

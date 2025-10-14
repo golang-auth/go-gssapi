@@ -29,8 +29,10 @@ const (
 	HasExtRFC4121
 	// HasExtGGF indicates support for GGF extensions (GDF: https://ogf.org/documents/GFD.24.pdf)
 	HasExtGGF
-	// HasS4U indicates support for Service4user constrained delegation extensions
-	HasS4U
+	// HasExtS4U indicates support for Service4user constrained delegation extensions
+	HasExtS4U
 	// HasExtCredPassword indicates support for acquiring credentials using passwords
 	HasExtCredPassword
+	// HasExtKrb5Identity indicates support for confguring the location of Keberos identities (Credentials cache and Keytab)
+	HasExtKrb5Identity
 )

@@ -211,7 +211,7 @@ type Provider interface {
 	//   A uninitialized GSSAPI security context ready for exchanging tokens with the peer when
 	//   the first call to [Continue()] with an empty input token is made.  [ContinueNeeded()] will true
 	//   when this call returns successfully.
-	InitSecContext(name GssName, opts ...InitSecContextOption) (SecContext, SecContextInfoPartial, error) // RFC 2743 § 2.2.1
+	InitSecContext(name GssName, opts ...InitSecContextOption) (SecContext, error) // RFC 2743 § 2.2.1
 
 	// AcceptSecContext corresponds to the GSS_Accept_sec_context function from RFC 2743 § 2.2.2.
 	// Parameters:
@@ -223,10 +223,7 @@ type Provider interface {
 	//
 	//   If [SecContext.ContinueNeeded()] returns true, additional message exchanges
 	//   with the initiator are required to fully establish the security context.
-	//
-	//   A partially established context may allow the creation of protected messages.
-	//   Check the [SecContextInfo.ProtectionReady] flag by calling [SecContext.Inquire()].
-	AcceptSecContext(opts ...AcceptSecContextOption) (SecContext, SecContextInfoPartial, error) // RFC 2743 § 2.2.2
+	AcceptSecContext(opts ...AcceptSecContextOption) (SecContext, error) // RFC 2743 § 2.2.2
 
 	// ImportSecContext corresponds to the GSS_Import_sec_context function from RFC 2743 § 2.2.9
 	// Parameters:

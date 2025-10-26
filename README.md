@@ -47,7 +47,12 @@ import (
     "github.com/golang-auth/go-gssapi/v3"
 )
 
-// GSSAPI-C is the name that go-gssapi-c registers itself under
-var gss = gssapi.NewProvider("GSSAPI-C")
+// the name that go-gssapi-c registers itself under
+var gss = gssapi.MustNewProvider("github.com/golang-auth/go-gssapi-c")
 ```
+
+## Example code
+
+Examples in Go are available along with C and Java examples collected from the Internet
+are available [in the gssapi-examples repo](https://github.com/golang-auth/gssapi-examples).
 

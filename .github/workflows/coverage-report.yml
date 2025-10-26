@@ -5,7 +5,7 @@ on:
   # Runs on pushes targeting the default branch
   push:
     branches: 
-      - v3
+      - main
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -40,15 +40,11 @@ jobs:
           echo pkgs=$(go list ./... | grep -v /examples/) >> "$GITHUB_ENV"
       - name: Generate coverage profile
         run: |
-          pushd v3
-          go test $pkgs -count 100 -coverprofile=../cover.out -covermode=atomic
-          popd
+          go test $pkgs -count 100 -coverprofile=cover.out -covermode=atomic
       - name: Generate report
         run: |
             mkdir -p ./coverage
-            pushd v3
-            go tool cover -html=../cover.out -o ../coverage/coverage.html
-            popd
+            go tool cover -html=cover.out -o coverage/coverage.html
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact

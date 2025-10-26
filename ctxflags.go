@@ -29,6 +29,9 @@ const (
 	ContextFlagDceStyle      = 0x1000 // add extra AP-REP from client to server after receiving server's AP-REP
 	ContextFlagIdentify      = 0x2000 // server should identify the client but not impersonate it
 	ContextFlagExtendedError = 0x4000 // return Windows status code in Kerberos error messages
+
+	// Delegate if the KDC policy allows it - see RFC 5896
+	ContextFlagDelegPolicy = 0x8000 // request delegation policy
 )
 
 // FlagList returns a slice of individual flags derived from the

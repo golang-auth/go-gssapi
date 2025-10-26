@@ -10,14 +10,16 @@ go-gssapi provides GSSAPI bindings for Go.
 
 # Overview
 This repository contains the Golang GSSAPI bindings interface and
-provider-independent support functions [described in the wiki](https://github.com/golang-auth/go-gssapi/wiki/Golang-GSSAPI-bindings-specification).  A GSSAPI
+provider-independent support functions [described in the wiki][go-gssapi-spec].  A GSSAPI
 provider that implements the interface is required along with this package.
 
 Versions prior to v3 of this repository contained a GSSAPI implementation that
 used native Golang Kerberos and was not pluggable.  As of version 3, the
 providers are separate to the interface.
 
-At this time, a provider that [wraps the C bindings](https://github.com/golang-auth/go-gssapi-c) is available.  We feel that the native Go Kerberos implementation needs a reasonable amount of work for it to be production ready and so a native provider will come at a later stage.  Developers are recommended to use the C wrappers
+At this time, a provider that [wraps the C bindings][gssapi-c]] is available.  We feel that the
+native Go Kerberos implementation needs a reasonable amount of work for it to be production ready
+and so a native provider will come at a later stage.  Developers are recommended to use the C wrappers
 at this stage.
 
 ## Installation
@@ -51,8 +53,16 @@ import (
 var gss = gssapi.MustNewProvider("github.com/golang-auth/go-gssapi-c")
 ```
 
+## HTTP Negotiate
+
+A GSSAPI enabled [http-client] is provided in [v3/http][gssapi-http].
+
 ## Example code
 
 Examples in Go are available along with C and Java examples collected from the Internet
 are available [in the gssapi-examples repo](https://github.com/golang-auth/gssapi-examples).
 
+[http-client]: https://pkg.go.dev/net/http#Client
+[gssapi-http]: v3/http
+[gssapi-c]: https://github.com/golang-auth/go-gssapi-c
+[go-gssapi-spec]: https://github.com/golang-auth/go-gssapi/wiki/Golang-GSSAPI-bindings-specification

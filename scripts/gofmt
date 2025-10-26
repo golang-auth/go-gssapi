@@ -9,7 +9,7 @@ cleanup() {
 trap cleanup EXIT
 
 
-find . -name \*.go -type f \! -name \*_gen.go \
+find . -name \*.go -type f \! -name \*_gen.go \! -name \*_gen_test.go \
   | xargs gofmt -l -d
   
   #  >${TMPDIR}/fmt.out

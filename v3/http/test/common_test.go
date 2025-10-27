@@ -17,13 +17,6 @@ import (
 
 //go:generate  ../../../build-tools/mk-test-vectors -o testvecs_test.go
 
-// func init() {
-// 	// RC4 woes
-// 	if isHeimdalFreeBSD() {
-// 		_ = os.Setenv("OPENSSL_CONF", "./openssl.cnf")
-// 	}
-// }
-
 func TestMain(m *testing.M) {
 	ta = mkTestAssets()
 	defer ta.Free()

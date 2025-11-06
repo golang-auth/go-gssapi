@@ -104,6 +104,8 @@ sed "s;%REALM%;${REALM};g" >${KDBDIR}/kadm5.acl <<EOF
 EOF
 
 cat >${TMPDIR}/package.tmpl <<"EOF"
+// SPDX-License-Identifier: Apache-2.0
+
 package test
 
 //lint:file-ignore U1000 Ignore all unused code, it's generated

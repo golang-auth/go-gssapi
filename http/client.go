@@ -1,27 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/*
-Package http provides a GSSAPI enabled http.Client.
-
-[Client] is a wrapper around the http.Client that adds GSSAPI authentication
-to the client.
-
-[WithNegotiate] creates a new [Client] with the given GSSAPI provider and options.
-
-[NewClient] creates a new [Client] with the given GSSAPI provider and options.
-
-[Client.Do] sends an HTTP request and returns an HTTP response, following
-policy (such as redirects, cookies, auth) as configured on the client.
-*/
 package http
 
 import (
 	"encoding/base64"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/golang-auth/go-gssapi/v3"
 )
@@ -36,31 +21,35 @@ func defaultSpnFunc(url url.URL) string {
 // DefaultSpnFunc is the default SPN function used for new clients.
 var DefaultSpnFunc SpnFunc = defaultSpnFunc
 
-// Client is an http.Client that supports GSSAPI authentication.  It is a wrapper around the http.Client
-type Client struct {
-	*http.Client
+// GSSAPITransport is a http.RoundTripper implementation that includes GSSAPI
+// (HTTP Negotiate) authentication.
+type GSSAPITransport struct {
+	transport http.RoundTripper
 
-	provider    gssapi.Provider
-	credential  gssapi.Credential
-	spnFunc     SpnFunc
-	preemptive  bool
-	mutual      bool
-	noExpect100 bool
+	provider           gssapi.Provider
+	credential         gssapi.Credential
+	spnFunc            SpnFunc
+	opportunistic      bool
+	mutual             bool
+	expect100Threshold uint32
+
+	httpLogging bool
+	logFunc     func(format string, args ...interface{})
 }
 
 // ClientOption is a function that configures a Client
-type ClientOption func(c *Client)
+type ClientOption func(c *GSSAPITransport)
 
-// WithPreemptive configures the client to preemptively authenticate
+// WithOpportunistic configures the client to opportunisticly authenticate
 //
-// Preemptive authentication means that the client does not wait for the server to
+// Opportunistic authentication means that the client does not wait for the server to
 // respond with a 401 status code before sending an authentication token.  This
 // is a performance optimization that can be used to reduce the number of round trips
 // between the client and server, at the cost of initializing the GSSAPI context and
 // potentially exposing authentcation credentials to the server unnecessarily.
-func WithPreemptive() ClientOption {
-	return func(c *Client) {
-		c.preemptive = true
+func WithOpportunistic() ClientOption {
+	return func(c *GSSAPITransport) {
+		c.opportunistic = true
 	}
 }
 
@@ -70,14 +59,14 @@ func WithPreemptive() ClientOption {
 // It causes the server to respond with a GSSAPI authentication token in the Authorization header
 // that the client can use to complete the context establishment and verify the server's identity.
 func WithMutual() ClientOption {
-	return func(c *Client) {
+	return func(c *GSSAPITransport) {
 		c.mutual = true
 	}
 }
 
 // WithCredential configures the client to use a specific credential
 func WithCredential(cred gssapi.Credential) ClientOption {
-	return func(c *Client) {
+	return func(c *GSSAPITransport) {
 		c.credential = cred
 	}
 }
@@ -86,59 +75,79 @@ func WithCredential(cred gssapi.Credential) ClientOption {
 //
 // The default uses "HTTP@" + the host name of the URL.
 func WithSpnFunc(spnFunc SpnFunc) ClientOption {
-	return func(c *Client) {
+	return func(c *GSSAPITransport) {
 		c.spnFunc = spnFunc
 	}
 }
 
-// WithNoExpect100 disables the use of the Expect: Continue header
+// WithExpect100Threshold configures the client to use the Expect: Continue header
+// if the request body is larger than the threshold.
 //
-// By default, the client will send the Expect: Continue header if there is a request body to send,
-// so that the server can let the client know when it has authenticated the client and is ready to receive
-// the request body.
-//
-// If this option is enabled, the client will not send the Expect header, and will instead
-// send the request body immediately.  This can be useful to work around servers that do not honour the Expect
-// header or as an optimization when used in conjunction with WithPreemptive.  Care should be taken when enabling
-// this option when not using WithPreemptive as the request will fail if the request body is not rewindable.
-func WithNoExpect100() ClientOption {
-	return func(c *Client) {
-		c.noExpect100 = true
+// The default threshold is 4kb.  Setting the threshold to 0 means that the client will not use the
+// Expect: Continue header.
+func WithExpect100Threshold(threshold uint32) ClientOption {
+	return func(c *GSSAPITransport) {
+		c.expect100Threshold = threshold
 	}
 }
 
-// WithNegotiate wraps an existing http.Client with a GSSAPI client.
-//
-// The provider is the GSSAPI provider to use for authentication.
-// The options are the ClientOptions to use for the client.
-//
-// If client is nil, the default http.Client will be used.
-func WithNegotiate(client *http.Client, provider gssapi.Provider, options ...ClientOption) Client {
+// WithRoundTripper configures the client to use a custom round tripper
+func WithRoundTripper(transport http.RoundTripper) ClientOption {
+	return func(c *GSSAPITransport) {
+		c.transport = transport
+	}
+}
+
+// WithHttpLogging configures the client to log the HTTP requests and responses
+// Does nothing without a log function
+func WithHttpLogging() ClientOption {
+	return func(c *GSSAPITransport) {
+		c.httpLogging = true
+	}
+}
+
+// WithLogFunc configures the client to use a custom log function
+func WithLogFunc(logFunc func(format string, args ...interface{})) ClientOption {
+	return func(c *GSSAPITransport) {
+		c.logFunc = logFunc
+	}
+}
+
+func NewTransport(provider gssapi.Provider, options ...ClientOption) http.RoundTripper {
+	dt := http.DefaultTransport.(*http.Transport)
+	dt.MaxConnsPerHost = 1
+	t := &GSSAPITransport{
+		transport:          http.DefaultTransport,
+		provider:           provider,
+		expect100Threshold: 4096,
+	}
+	for _, option := range options {
+		option(t)
+	}
+	if t.httpLogging && t.logFunc == nil {
+		t.httpLogging = false
+	}
+	return t
+}
+
+func NewClient(provider gssapi.Provider, client *http.Client, options ...ClientOption) *http.Client {
 	if client == nil {
 		client = http.DefaultClient
 	}
-	c := Client{
-		Client:   client,
-		provider: provider,
-		spnFunc:  DefaultSpnFunc,
+
+	if client.Transport != nil {
+		options = append(options, WithRoundTripper(client.Transport))
 	}
-	for _, option := range options {
-		option(&c)
-	}
-	return c
+
+	// Copy the client to avoid modifying the original
+	newClient := *client
+	newClient.Transport = NewTransport(provider, options...)
+	return &newClient
 }
 
-// NewClient creates a new Client with the given GSSAPI provider and options.
-//
-// The provider is the GSSAPI provider to use for authentication.
-// The options are the ClientOptions to use for the client.
-func NewClient(provider gssapi.Provider, options ...ClientOption) Client {
-	return WithNegotiate(nil, provider, options...)
-}
-
-func (c *Client) setInitialToken(req *http.Request) (gssapi.SecContext, error) {
-	spn := c.spnFunc(*req.URL)
-	spnName, err := c.provider.ImportName(spn, gssapi.GSS_NT_HOSTBASED_SERVICE)
+func (t *GSSAPITransport) setInitialToken(req *http.Request) (gssapi.SecContext, error) {
+	spn := t.spnFunc(*req.URL)
+	spnName, err := t.provider.ImportName(spn, gssapi.GSS_NT_HOSTBASED_SERVICE)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +155,7 @@ func (c *Client) setInitialToken(req *http.Request) (gssapi.SecContext, error) {
 
 	// always request integrity
 	flags := gssapi.ContextFlagInteg
-	if c.mutual {
+	if t.mutual {
 		// optionally request mutual authentication
 		flags |= gssapi.ContextFlagMutual
 	}
@@ -155,7 +164,7 @@ func (c *Client) setInitialToken(req *http.Request) (gssapi.SecContext, error) {
 		gssapi.WithInitiatorFlags(flags),
 	}
 
-	secCtx, err := c.provider.InitSecContext(spnName, opts...)
+	secCtx, err := t.provider.InitSecContext(spnName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -169,138 +178,40 @@ func (c *Client) setInitialToken(req *http.Request) (gssapi.SecContext, error) {
 	return secCtx, nil
 }
 
-// Post issues a POST to the specified URL.
-//
-// Caller should close resp.Body when done reading from it.
-//
-// If the provided body is an [io.Closer], it is closed after the
-// request.
-//
-// To set custom headers, use [NewRequest] and [Client.Do].
-//
-// To make a request with a specified context.Context, use [NewRequestWithContext]
-// and [Client.Do].
-//
-// See the [Client.Do] method documentation for details on how redirects
-// are handled.
-func (c *Client) Post(url string, contentType string, body io.Reader) (*http.Response, error) {
-	req, err := http.NewRequest("POST", url, body)
+// Use the underlying transport's RoundTripper wrapped in HTTP logging
+// if enabled.
+func (t *GSSAPITransport) roundTrip(req *http.Request) (*http.Response, error) {
+	if t.httpLogging {
+		err := t.requestLogging(req)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	resp, err := t.transport.RoundTrip(req)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", contentType)
-	return c.Do(req)
-}
 
-// Get issues a GET to the specified URL. If the response is one of the
-// following redirect codes, Get follows the redirect after calling the
-// [Client.CheckRedirect] function:
-//
-//	301 (Moved Permanently)
-//	302 (Found)
-//	303 (See Other)
-//	307 (Temporary Redirect)
-//	308 (Permanent Redirect)
-//
-// An error is returned if the [Client.CheckRedirect] function fails
-// or if there was an HTTP protocol error. A non-2xx response doesn't
-// cause an error. Any returned error will be of type [*url.Error]. The
-// url.Error value's Timeout method will report true if the request
-// timed out.
-//
-// When err is nil, resp always contains a non-nil resp.Body.
-// Caller should close resp.Body when done reading from it.
-//
-// To make a request with custom headers, use [NewRequest] and [Client.Do].
-//
-// To make a request with a specified context.Context, use [NewRequestWithContext]
-// and Client.Do.
-func (c *Client) Get(url string) (*http.Response, error) {
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
+	if t.httpLogging {
+		err := t.responseLogging(resp)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return c.Do(req)
+	return resp, nil
 }
 
-// Head issues a HEAD to the specified URL. If the response is one of the
-// following redirect codes, Head follows the redirect after calling the
-// [Client.CheckRedirect] function:
-//
-//	301 (Moved Permanently)
-//	302 (Found)
-//	303 (See Other)
-//	307 (Temporary Redirect)
-//	308 (Permanent Redirect)
-//
-// To make a request with a specified [context.Context], use [NewRequestWithContext]
-// and [Client.Do].
-func (c *Client) Head(url string) (*http.Response, error) {
-	req, err := http.NewRequest("HEAD", url, nil)
-	if err != nil {
-		return nil, err
+func (t *GSSAPITransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if t.httpLogging {
+		req = t.setupLogging(req)
 	}
-	return c.Do(req)
-}
 
-// PostForm issues a POST to the specified URL,
-// with data's keys and values URL-encoded as the request body.
-//
-// The Content-Type header is set to application/x-www-form-urlencoded.
-// To set other headers, use [NewRequest] and [Client.Do].
-//
-// When err is nil, resp always contains a non-nil resp.Body.
-// Caller should close resp.Body when done reading from it.
-//
-// See the [Client.Do] method documentation for details on how redirects
-// are handled.
-//
-// To make a request with a specified context.Context, use [NewRequestWithContext]
-// and Client.Do.
-func (c *Client) PostForm(url string, data url.Values) (resp *http.Response, err error) {
-	return c.Post(url, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
-}
-
-// Do sends an HTTP request and returns an HTTP response, following
-// policy (such as redirects, cookies, auth) as configured on the
-// client.
-//
-// An error is returned if caused by client policy (such as
-// CheckRedirect), or failure to speak HTTP (such as a network
-// connectivity problem). A non-2xx status code doesn't cause an
-// error.
-//
-// If the returned error is nil, the [Response] will contain a non-nil
-// Body which the user is expected to close. If the Body is not both
-// read to EOF and closed, the [Client]'s underlying [RoundTripper]
-// (typically [Transport]) may not be able to re-use a persistent TCP
-// connection to the server for a subsequent "keep-alive" request.
-//
-// The request Body, if non-nil, will be closed by the underlying
-// Transport, even on errors. The Body may be closed asynchronously after
-// Do returns.
-//
-// On error, any Response can be ignored. A non-nil Response with a
-// non-nil error only occurs when CheckRedirect fails, and even then
-// the returned [Response.Body] is already closed.
-//
-// Generally [Get], [Post], or [PostForm] will be used instead of Do.
-//
-// If the server replies with a redirect, the Client first uses the
-// CheckRedirect function to determine whether the redirect should be
-// followed. If permitted, a 301, 302, or 303 redirect causes
-// subsequent requests to use HTTP method GET
-// (or HEAD if the original request was HEAD), with no body.
-// A 307 or 308 redirect preserves the original HTTP method and body,
-// provided that the [Request.GetBody] function is defined.
-// The [NewRequest] function automatically sets GetBody for common
-// standard library body types.
-//
-// Any returned error will be of type [*url.Error]. The url.Error
-// value's Timeout method will report true if the request timed out.
-func (c *Client) Do(req *http.Request) (*http.Response, error) {
 	var secCtx gssapi.SecContext
 	var err error
+
+	// We are not meant to modify the request, so we need to create a new one
+	req = req.Clone(req.Context())
 
 	defer func() {
 		if secCtx != nil {
@@ -308,35 +219,56 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 		}
 	}()
 
-	// Preemptively set the initial token if preemptive authentication is requested
-	if c.preemptive {
-		secCtx, err = c.setInitialToken(req)
+	// Preemptively set the initial token if opportunistic authentication is requested
+	if t.opportunistic {
+		secCtx, err = t.setInitialToken(req)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	// Don't send the body until the server has authenticated us.  Unfortunately the server
-	// won't send us its mutual authentication token with its 100-Continue response (we only see
-	// that after it has processed the request)so this doesn't allow us to verify the server's identity
-	// before sending it the request body.
-	if req.Body != nil && !c.noExpect100 {
-		req.Header.Set("Expect", "100-continue")
+	// use Expect: Continue for large requests or if we can't rewind the body
+	// This causes the server to close the connection if it needs to send a 401 response, so we don't want to
+	// always use this.
+	if t.expect100Threshold > 0 && !t.opportunistic {
+		useExpect100 := false
+		if req.ContentLength > int64(t.expect100Threshold) {
+			t.logFunc("Using Expect: Continue header because request body is larger than %d bytes", t.expect100Threshold)
+			useExpect100 = true
+		}
+		if req.GetBody == nil && !t.opportunistic {
+			t.logFunc("Using Expect: Continue header because request body is not rewindable and opportunistic authentication is not requested")
+			useExpect100 = true
+		}
+		if useExpect100 {
+			req.Header.Set("Expect", "100-continue")
+		}
 	}
 
-	resp, err := c.Client.Do(req)
+	// Send the request / get a response
+	resp, err := t.roundTrip(req)
 	if err != nil {
 		return nil, err
 	}
 
-	// Redo the request with an initial token if we didn't already send one preemptively
-	if resp.StatusCode == 401 && !c.preemptive {
-		secCtx, err = c.setInitialToken(req)
+	// Redo the request with an initial token if we didn't already send one opportunistically
+	if resp.StatusCode == 401 && !t.opportunistic {
+		negotiateChallenge, err := FindOneWwwAuthenticateChallenge(&resp.Header, "Negotiate")
 		if err != nil {
 			return nil, err
 		}
 
-		resp, err = c.Client.Do(req)
+		// the challenge must not have a token or parameters
+		if negotiateChallenge.Token68 != "" || len(negotiateChallenge.Parameters) > 0 {
+			return nil, fmt.Errorf("negotiate challenge must not have a token or parameters")
+		}
+
+		secCtx, err = t.setInitialToken(req)
+		if err != nil {
+			return nil, err
+		}
+
+		resp, err = t.roundTrip(req)
 		if err != nil {
 			return nil, err
 		}
@@ -345,41 +277,31 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 	// If we are doing mutual auth (which is of dubious value for HTTP), we need to
 	// validate the response token.  At least we can catch a trojan server even if we
 	// will have sent it the request body already.
-	if resp.StatusCode != 401 && c.mutual {
-		authzType, authzToken := parseAuthzHeader(&resp.Header)
-
-		// Validate the response token - which will be supplied if we're doing
-		// mutual authentication.
-		if authzType == "Negotiate" && len(authzToken) > 0 {
-			rawToken, err := base64.StdEncoding.DecodeString(authzToken)
-			if err != nil {
-				return nil, err
-			}
-			_, info, err := secCtx.Continue(rawToken)
-			if err != nil {
-				return nil, err
-			}
-
-			// verify that we have the flags we requested
-			if info.Flags&gssapi.ContextFlagMutual == 0 {
-				return nil, fmt.Errorf("mutual authentication requested but not available")
-			}
-		} else {
-			return nil, fmt.Errorf("no response token - required for mutual authentication")
+	if resp.StatusCode != 401 && t.mutual {
+		negotiateChallenge, err := FindOneWwwAuthenticateChallenge(&resp.Header, "Negotiate")
+		if err != nil {
+			return nil, err
 		}
 
-	}
-	return resp, nil
-}
+		// the challenge must have a token
+		if negotiateChallenge.Token68 == "" {
+			return nil, fmt.Errorf("no response token - required for mutual authentication: %+v / %+v", negotiateChallenge, resp.Header)
+		}
 
-func parseAuthzHeader(headers *http.Header) (string, string) {
-	header := headers.Get("Authorization")
-	if header == "" {
-		return "", ""
+		rawToken, err := base64.StdEncoding.DecodeString(negotiateChallenge.Token68)
+		if err != nil {
+			return nil, err
+		}
+		_, info, err := secCtx.Continue(rawToken)
+		if err != nil {
+			return nil, err
+		}
+
+		// verify that we have the flags we requested
+		if info.Flags&gssapi.ContextFlagMutual == 0 {
+			return nil, fmt.Errorf("mutual authentication requested but not available")
+		}
 	}
-	parts := strings.SplitN(header, " ", 2)
-	if len(parts) != 2 {
-		return "", ""
-	}
-	return parts[0], parts[1]
+
+	return resp, nil
 }

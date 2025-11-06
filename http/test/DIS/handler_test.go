@@ -33,7 +33,7 @@ func TestHandler(t *testing.T) {
 		}),
 	}
 
-	client := ghttp.NewClient(ta.lib, opts...)
+	client := ghttp.NewClient(ta.lib, nil, opts...)
 	req, err := http.NewRequest("GET", server.URL, nil)
 	assert.NoErrorFatal(err)
 

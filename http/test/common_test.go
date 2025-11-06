@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-//go:generate  ../../../build-tools/mk-test-vectors -o testvecs_test.go
+//go:generate  ../../build-tools/mk-test-vectors -o testvecs_test.go
 
 func TestMain(m *testing.M) {
 	ta = mkTestAssets()
@@ -45,12 +45,6 @@ func (a *myassert) NoErrorFatal(err error) {
 func NewAssert(t *testing.T) *myassert {
 	a := assert.New(t)
 	return &myassert{a, t}
-}
-
-func releaseName(name gssapi.GssName) {
-	if name != nil {
-		_ = name.Release()
-	}
 }
 
 type testAssets struct {
@@ -140,6 +134,11 @@ func CopyFile(src, dst string) error {
 }
 
 func (ta *testAssets) useAsset(t *testing.T, at testAssetType) {
+
+	if t != nil {
+		t.Helper()
+	}
+
 	var err error
 	switch {
 	case at&testKeytabRack > 0:

@@ -158,8 +158,6 @@ func WithLogFunc(logFunc func(format string, args ...interface{})) ClientOption 
 // authentication support. By default it wraps [http.DefaultTransport] - this can be
 // overridden by passing a custom round tripper with [WithRoundTripper].
 func NewTransport(provider gssapi.Provider, options ...ClientOption) *GSSAPITransport {
-	dt := http.DefaultTransport.(*http.Transport)
-	dt.MaxConnsPerHost = 1
 	t := &GSSAPITransport{
 		transport:        http.DefaultTransport,
 		provider:         provider,

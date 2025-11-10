@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-//go:generate  ../../build-tools/mk-test-vectors -o testvecs_test.go
+//go:generate  ../../build-tools/mk-test-vectors -o testvecs_gen_test.go
 
 func TestMain(m *testing.M) {
 	ta = mkTestAssets()

@@ -200,7 +200,7 @@ func (t *GSSAPITransport) initSecContext(req *http.Request) (gssapi.SecContext, 
 	if err != nil {
 		return nil, err
 	}
-	defer spnName.Release()
+	defer spnName.Release() //nolint:errcheck
 
 	// always request integrity
 	flags := gssapi.ContextFlagInteg

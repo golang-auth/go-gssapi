@@ -75,14 +75,6 @@ func (w *wwwAuthenticate) FindOneSchemeChallenge(scheme string) (*authChallenge,
 	}
 }
 
-func findOneWwwAuthenticateChallenge(headers *http.Header, scheme string) (*authChallenge, error) {
-	wwwAuth := parseWwwAuthenticateHeader(headers)
-	if wwwAuth == nil {
-		return nil, fmt.Errorf("no valid WWW-Authenticate header found in response")
-	}
-	return wwwAuth.FindOneSchemeChallenge(scheme)
-}
-
 func findSchemeChallenges(headers *http.Header, scheme string) []authChallenge {
 	wwwAuth := parseWwwAuthenticateHeader(headers)
 	if wwwAuth == nil {

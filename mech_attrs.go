@@ -4,7 +4,7 @@ package gssapi
 
 import "slices"
 
-//go:generate  go run ../build-tools/gen-gss-mech-attrs.go -o mech_attrs_gen.go
+//go:generate  go run ./build-tools/gen-gss-mech-attrs.go -o mech_attrs_gen.go
 
 // GssMechAttr represents mechanism attributes as defined in RFC 5587. The Go bindings support
 // mechanism attributes for describing the capabilities and properties of GSSAPI mechanisms.

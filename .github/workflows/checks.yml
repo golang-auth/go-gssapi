@@ -3,10 +3,10 @@ name: Checks
 on:
   push:
     branches:
-      - v3
+      - main
   pull_request:
     branches:
-      - v3
+      - main
 
 permissions:
   contents: read
@@ -34,7 +34,6 @@ jobs:
       uses: golangci/golangci-lint-action@v8
       with:
         version: latest
-        working-directory: v3
 
   basic-tests:
     name: Basic tests
@@ -65,12 +64,13 @@ jobs:
 
       - name: Generate test includes
         run: |
-          echo pkgs=$(cd v3 && go list ./... | grep -v /examples/) >> "$GITHUB_ENV"
+          echo pkgs=$(go list ./... | grep -v /examples/) >> "$GITHUB_ENV"
 
       - name: Run tests
         run: |
-          pushd v3
           go test $pkgs -count 100 -coverprofile=../cover.out -covermode=atomic
+          pushd http/tests
+          go test
           popd
 
       - name: Check test coverage

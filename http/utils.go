@@ -16,11 +16,11 @@ func parseAuthzHeader(headers *http.Header) (string, string) {
 	if len(parts) != 2 {
 		return "", ""
 	}
-	return parts[0], parts[1]
+	return strings.ToLower(parts[0]), parts[1]
 }
 
-// AuthChallenge represents a single authentication challenge from a WWW-Authenticate header.
-type AuthChallenge struct {
+// authChallenge represents a single authentication challenge from a WWW-Authenticate header.
+type authChallenge struct {
 	// Scheme is the authentication scheme (e.g., "Negotiate", "Basic", "Digest").
 	Scheme string
 
@@ -33,12 +33,12 @@ type AuthChallenge struct {
 	Parameters map[string]string
 }
 
-// WwwAuthenticate represents the parsed WWW-Authenticate header response.
+// wwwAuthenticate represents the parsed WWW-Authenticate header response.
 // It contains all authentication challenges found in the header(s).
-type WwwAuthenticate struct {
+type wwwAuthenticate struct {
 	// Challenges contains all authentication challenges found in the header(s).
 	// The order is preserved from the header order.
-	Challenges []AuthChallenge
+	Challenges []authChallenge
 }
 
 // filterIterator returns an iterator function that yields elements from slice
@@ -56,14 +56,14 @@ func filterIterator[T any](slice []T, match func(T) bool) func(func(T) bool) {
 	}
 }
 
-func (w *WwwAuthenticate) SchemeChallenges(scheme string) []AuthChallenge {
-	iterator := filterIterator(w.Challenges, func(c AuthChallenge) bool {
+func (w *wwwAuthenticate) SchemeChallenges(scheme string) []authChallenge {
+	iterator := filterIterator(w.Challenges, func(c authChallenge) bool {
 		return c.Scheme == scheme
 	})
 	return slices.Collect(iterator)
 }
 
-func (w *WwwAuthenticate) FindOneSchemeChallenge(scheme string) (*AuthChallenge, error) {
+func (w *wwwAuthenticate) FindOneSchemeChallenge(scheme string) (*authChallenge, error) {
 	challenges := w.SchemeChallenges(scheme)
 	switch len(challenges) {
 	default:
@@ -75,15 +75,23 @@ func (w *WwwAuthenticate) FindOneSchemeChallenge(scheme string) (*AuthChallenge,
 	}
 }
 
-func FindOneWwwAuthenticateChallenge(headers *http.Header, scheme string) (*AuthChallenge, error) {
-	wwwAuth := ParseWwwAuthenticateHeader(headers)
+func findOneWwwAuthenticateChallenge(headers *http.Header, scheme string) (*authChallenge, error) {
+	wwwAuth := parseWwwAuthenticateHeader(headers)
 	if wwwAuth == nil {
 		return nil, fmt.Errorf("no valid WWW-Authenticate header found in response")
 	}
 	return wwwAuth.FindOneSchemeChallenge(scheme)
 }
 
-// ParseWwwAuthenticateHeader parses the WWW-Authenticate header from a response.
+func findSchemeChallenges(headers *http.Header, scheme string) []authChallenge {
+	wwwAuth := parseWwwAuthenticateHeader(headers)
+	if wwwAuth == nil {
+		return nil
+	}
+	return wwwAuth.SchemeChallenges(scheme)
+}
+
+// parseWwwAuthenticateHeader parses the WWW-Authenticate header from a response.
 // It returns a WwwAuthenticate struct containing all authentication challenges found.
 // Returns nil if no WWW-Authenticate header is present.
 //
@@ -97,14 +105,14 @@ func FindOneWwwAuthenticateChallenge(headers *http.Header, scheme string) (*Auth
 //
 // Multiple challenges can be comma-separated in one header, or multiple headers can be sent.
 // For the Negotiate scheme, the format is typically just "Negotiate" or "Negotiate <token68>".
-func ParseWwwAuthenticateHeader(headers *http.Header) *WwwAuthenticate {
+func parseWwwAuthenticateHeader(headers *http.Header) *wwwAuthenticate {
 	// Get all WWW-Authenticate headers (there can be multiple)
 	wwwAuthHeaders := headers.Values("WWW-Authenticate")
 	if len(wwwAuthHeaders) == 0 {
 		return nil
 	}
 
-	var allChallenges []AuthChallenge
+	var allChallenges []authChallenge
 
 	// Process all headers and challenges
 	for _, headerValue := range wwwAuthHeaders {
@@ -125,20 +133,20 @@ func ParseWwwAuthenticateHeader(headers *http.Header) *WwwAuthenticate {
 		return nil
 	}
 
-	return &WwwAuthenticate{
+	return &wwwAuthenticate{
 		Challenges: allChallenges,
 	}
 }
 
 // parseChallenge parses a single challenge string into an AuthChallenge struct.
-func parseChallenge(challengeStr string) *AuthChallenge {
+func parseChallenge(challengeStr string) *authChallenge {
 	// Split the challenge into scheme and the rest
 	parts := strings.Fields(challengeStr)
 	if len(parts) == 0 {
 		return nil
 	}
 
-	challenge := &AuthChallenge{
+	challenge := &authChallenge{
 		Scheme:     parts[0],
 		Parameters: make(map[string]string),
 	}

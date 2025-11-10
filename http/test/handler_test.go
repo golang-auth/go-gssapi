@@ -43,5 +43,7 @@ func TestHandler(t *testing.T) {
 	defer resp.Body.Close()
 
 	assert.Equal(http.StatusOK, resp.StatusCode)
+
+	// initiator name would only be available if GSSAPI authenticatinon happned
 	assert.Equal(cliname, initiatorName.PrincipalName)
 }

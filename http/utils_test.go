@@ -1,20 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package test
+package http
 
 import (
 	"net/http"
 	"reflect"
 	"testing"
-
-	ghttp "github.com/golang-auth/go-gssapi/v3/http"
 )
 
 func TestParseWwwAuthenticateHeader(t *testing.T) {
 	tests := []struct {
 		name     string
 		headers  map[string][]string
-		expected *ghttp.WwwAuthenticate
+		expected *wwwAuthenticate
 	}{
 		{
 			name:     "No header",
@@ -26,8 +24,8 @@ func TestParseWwwAuthenticateHeader(t *testing.T) {
 			headers: map[string][]string{
 				"WWW-Authenticate": {`Basic realm="Dev", charset="UTF-8"`},
 			},
-			expected: &ghttp.WwwAuthenticate{
-				Challenges: []ghttp.AuthChallenge{
+			expected: &wwwAuthenticate{
+				Challenges: []authChallenge{
 					{
 						Scheme: "Basic",
 						Parameters: map[string]string{
@@ -43,8 +41,8 @@ func TestParseWwwAuthenticateHeader(t *testing.T) {
 			headers: map[string][]string{
 				"WWW-Authenticate": {"Negotiate"},
 			},
-			expected: &ghttp.WwwAuthenticate{
-				Challenges: []ghttp.AuthChallenge{
+			expected: &wwwAuthenticate{
+				Challenges: []authChallenge{
 					{
 						Scheme:     "Negotiate",
 						Token68:    "",
@@ -59,8 +57,8 @@ func TestParseWwwAuthenticateHeader(t *testing.T) {
 			headers: map[string][]string{
 				"WWW-Authenticate": {"Negotiate YIIBzgYJKoZIhvcSAQICAQBuggHXMIIB0wIBADCBvQYJKoZIhvcNAQcB"},
 			},
-			expected: &ghttp.WwwAuthenticate{
-				Challenges: []ghttp.AuthChallenge{
+			expected: &wwwAuthenticate{
+				Challenges: []authChallenge{
 					{
 						Scheme:     "Negotiate",
 						Token68:    "YIIBzgYJKoZIhvcSAQICAQBuggHXMIIB0wIBADCBvQYJKoZIhvcNAQcB",
@@ -74,8 +72,8 @@ func TestParseWwwAuthenticateHeader(t *testing.T) {
 			headers: map[string][]string{
 				"WWW-Authenticate": {"Negotiate SGVsbG8xMgo="},
 			},
-			expected: &ghttp.WwwAuthenticate{
-				Challenges: []ghttp.AuthChallenge{
+			expected: &wwwAuthenticate{
+				Challenges: []authChallenge{
 					{
 						Scheme:     "Negotiate",
 						Token68:    "SGVsbG8xMgo=",
@@ -89,8 +87,8 @@ func TestParseWwwAuthenticateHeader(t *testing.T) {
 			headers: map[string][]string{
 				"WWW-Authenticate": {"Negotiate SGVsbG8xCg=="},
 			},
-			expected: &ghttp.WwwAuthenticate{
-				Challenges: []ghttp.AuthChallenge{
+			expected: &wwwAuthenticate{
+				Challenges: []authChallenge{
 					{
 						Scheme:     "Negotiate",
 						Token68:    "SGVsbG8xCg==",
@@ -104,8 +102,8 @@ func TestParseWwwAuthenticateHeader(t *testing.T) {
 			headers: map[string][]string{
 				"WWW-Authenticate": {"Basic realm=\"staging environment\""},
 			},
-			expected: &ghttp.WwwAuthenticate{
-				Challenges: []ghttp.AuthChallenge{
+			expected: &wwwAuthenticate{
+				Challenges: []authChallenge{
 					{
 						Scheme: "Basic",
 						Parameters: map[string]string{
@@ -120,8 +118,8 @@ func TestParseWwwAuthenticateHeader(t *testing.T) {
 			headers: map[string][]string{
 				"WWW-Authenticate": {"Negotiate, Basic realm=\"Dev\""},
 			},
-			expected: &ghttp.WwwAuthenticate{
-				Challenges: []ghttp.AuthChallenge{
+			expected: &wwwAuthenticate{
+				Challenges: []authChallenge{
 					{
 						Scheme:     "Negotiate",
 						Token68:    "",
@@ -141,8 +139,8 @@ func TestParseWwwAuthenticateHeader(t *testing.T) {
 			headers: map[string][]string{
 				"WWW-Authenticate": {"Negotiate", "Basic realm=\"Dev\""},
 			},
-			expected: &ghttp.WwwAuthenticate{
-				Challenges: []ghttp.AuthChallenge{
+			expected: &wwwAuthenticate{
+				Challenges: []authChallenge{
 					{
 						Scheme:     "Negotiate",
 						Token68:    "",
@@ -162,8 +160,8 @@ func TestParseWwwAuthenticateHeader(t *testing.T) {
 			headers: map[string][]string{
 				"WWW-Authenticate": {"Digest realm=\"testrealm@host.com\", qop=\"auth,auth-int\", nonce=\"dcd98b7102dd2f0e8b11d0f600bfb0c093\", opaque=\"5ccc069c403ebaf9f0171e9517f40e41\""},
 			},
-			expected: &ghttp.WwwAuthenticate{
-				Challenges: []ghttp.AuthChallenge{
+			expected: &wwwAuthenticate{
+				Challenges: []authChallenge{
 					{
 						Scheme: "Digest",
 						Parameters: map[string]string{
@@ -181,8 +179,8 @@ func TestParseWwwAuthenticateHeader(t *testing.T) {
 			headers: map[string][]string{
 				"WWW-Authenticate": {"Basic realm=\"staging, environment\""},
 			},
-			expected: &ghttp.WwwAuthenticate{
-				Challenges: []ghttp.AuthChallenge{
+			expected: &wwwAuthenticate{
+				Challenges: []authChallenge{
 					{
 						Scheme: "Basic",
 						Parameters: map[string]string{
@@ -197,8 +195,8 @@ func TestParseWwwAuthenticateHeader(t *testing.T) {
 			headers: map[string][]string{
 				"WWW-Authenticate": {"AWS4-HMAC-SHA256 Credential=\"AKIDEXAMPLE/20150830/us-east-1/iam/aws4_request\", SignedHeaders=\"host;x-amz-date\", Signature=\"5d672d79c15b13162d9279b0855cfba6789a8edb4c82c400e06b5924a6f2b5d7\""},
 			},
-			expected: &ghttp.WwwAuthenticate{
-				Challenges: []ghttp.AuthChallenge{
+			expected: &wwwAuthenticate{
+				Challenges: []authChallenge{
 					{
 						Scheme: "AWS4-HMAC-SHA256",
 						Parameters: map[string]string{
@@ -215,8 +213,8 @@ func TestParseWwwAuthenticateHeader(t *testing.T) {
 			headers: map[string][]string{
 				"WWW-Authenticate": {"basic realm=\"Dev\""},
 			},
-			expected: &ghttp.WwwAuthenticate{
-				Challenges: []ghttp.AuthChallenge{
+			expected: &wwwAuthenticate{
+				Challenges: []authChallenge{
 					{
 						Scheme: "basic",
 						Parameters: map[string]string{
@@ -238,8 +236,8 @@ func TestParseWwwAuthenticateHeader(t *testing.T) {
 			headers: map[string][]string{
 				"WWW-Authenticate": {"Negotiate YIIBzgYJKoZIhvcSAQICAQBuggHXMIIB0wIBADCBvQYJKoZIhvcNAQcB, Basic realm=\"Dev\", charset=\"UTF-8\""},
 			},
-			expected: &ghttp.WwwAuthenticate{
-				Challenges: []ghttp.AuthChallenge{
+			expected: &wwwAuthenticate{
+				Challenges: []authChallenge{
 					{
 						Scheme:     "Negotiate",
 						Token68:    "YIIBzgYJKoZIhvcSAQICAQBuggHXMIIB0wIBADCBvQYJKoZIhvcNAQcB",
@@ -266,7 +264,7 @@ func TestParseWwwAuthenticateHeader(t *testing.T) {
 				}
 			}
 
-			result := ghttp.ParseWwwAuthenticateHeader(&headers)
+			result := parseWwwAuthenticateHeader(&headers)
 
 			if tt.expected == nil {
 				if result != nil {

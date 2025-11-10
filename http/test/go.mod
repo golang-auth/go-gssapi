@@ -1,6 +1,6 @@
 module golang-auth/go-gssapi/v3/http/test
 
-go 1.24.8
+go 1.24
 
 replace github.com/golang-auth/go-gssapi/v3 => ../../
 

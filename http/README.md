@@ -7,8 +7,8 @@ The `http` package provides a GSSAPI-enabled HTTP client for Go applications.
 
 ## Overview
 
-The package provides a wrapper around the standard `http.Client` that adds GSSAPI authentication support.
-It handles the negotiation of GSSAPI authentication tokens and the authorization header for HTTP requests.
+The package provides a RoundTripper that adds GSSAPI authentication support as defined
+in [RFC 4559][rfc4559].
 
 
 ## Basic Usage
@@ -27,7 +27,7 @@ import (
 func main() {
     p := gssapi.MustNewProvider("github.com/golang-auth/go-gssapi-c")
     
-    client := http.NewClient(p)
+    client := http.NewClient(p, nil)
     resp, err := client.Get("https://example.com")
     if err != nil {
         log.Fatal(err)
@@ -43,4 +43,4 @@ See the [GoDoc reference][godoc] for more detailed usage information.
 
 
 [godoc]: https://pkg.go.dev/mod/github.com/golang-auth/go-gssapi/v3/http
-
+[rfc4559]: https://datatracker.ietf.org/doc/html/rfc4559

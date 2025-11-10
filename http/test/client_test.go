@@ -110,9 +110,8 @@ func enableLogging() bool {
 	return enableLogging
 }
 
-// TestClient uses a small POST body that does no trigger the 100-continue header - and is
-// rewindable.  These tests verify how the client handles authentication and authentication
-// failures.
+// TestClient uses a small rewindble POST body with Expect: Continue disabled.
+// These tests verify how the client handles authentication and authentication failures.
 func TestClient(t *testing.T) {
 	ta.useAsset(t, testCredCache|testKeytabRack)
 
@@ -197,11 +196,11 @@ func TestClient100Continue(t *testing.T) {
 
 	tests := []struct {
 		name                    string
-		expectContinueThreshold uint32 // the threshold for using 100-continue
-		clientOpportunistic     bool   // the client should preemptively authenticate
-		rewindableBody          bool   // should the request body be rewindable?
-		expect100Continue       bool   // expect the 100-continue header?
-		expectError             bool   // expect an error?
+		expectContinueThreshold int64 // the threshold for using 100-continue
+		clientOpportunistic     bool  // the client should preemptively authenticate
+		rewindableBody          bool  // should the request body be rewindable?
+		expect100Continue       bool  // expect the 100-continue header?
+		expectError             bool  // expect an error?
 	}{
 		// these tests should note trigger 100-continue header because opportunistic authentication is requested
 		{"BigBody-Opportunistic-Rewindable", 100, true, true, false, false},
@@ -216,7 +215,7 @@ func TestClient100Continue(t *testing.T) {
 		{"SmallBody-Non-Opportunistic-Rewindable", 4096, false, true, false, false},
 		// this test will trigger the 100-continue header because it is non-opportunistic and the body is not rewindable, making the request successful
 		{"SmallBody-Non-Opportunistic-Non-Rewindable", 4096, false, false, true, false},
-		// should fail not trigger 100-continue (disabled) - so will fail because the body will be sent before receiving the 401
+		// should fail not trigger 100-continue (disabled) - so will fail because the non-rewindable body will be sent before receiving the 401
 		{"SmallBody-Non-Opportunistic-Non-Rewindable-100-disabled", 0, false, false, false, true},
 	}
 

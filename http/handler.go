@@ -70,13 +70,18 @@ func NewHandler(provider gssapi.Provider, next http.Handler, options ...HandlerO
 // ServeHTTP performs the GSSAPI authentication and passes the initiator name to the next handler
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	authzType, authzToken := parseAuthzHeader(&r.Header)
-	if authzType == "Negotiate" && len(authzToken) > 0 {
+	if authzType == "negotiate" && len(authzToken) > 0 {
 		rawToken, err := base64.StdEncoding.DecodeString(authzToken)
 		if err != nil {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
-		secCtx, err := h.provider.AcceptSecContext()
+
+		opts := []gssapi.AcceptSecContextOption{}
+		if h.credential != nil {
+			opts = append(opts, gssapi.WithAcceptorCredential(h.credential))
+		}
+		secCtx, err := h.provider.AcceptSecContext(opts...)
 		if err != nil {
 			w.WriteHeader(http.StatusUnauthorized)
 			return

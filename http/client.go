@@ -21,6 +21,29 @@ func defaultSpnFunc(url url.URL) string {
 // DefaultSpnFunc is the default SPN function used for new clients.
 var DefaultSpnFunc SpnFunc = defaultSpnFunc
 
+// OpportunisticFunc is a function that returns true if opportunistic authentication should be used for a given URL.
+type OpportunisticFunc func(url url.URL) bool
+
+func opportunisticsFuncAlways(url url.URL) bool {
+	return true
+}
+
+// DelegationPolicy is the policy for delegation of credentials to the server.
+type DelegationPolicy int
+
+const (
+	// DelegationPolicyNever means that credentials will not be delegated to the server.
+	DelegationPolicyNever DelegationPolicy = iota
+	// DelegationPolicyAlways means that credentials will be delegated to the server.
+	DelegationPolicyAlways
+	// DelegationPolicyIfAllowed means that credentials will be delegated to the server
+	// if the policy (eg. Kerberos OK-as-delegate policy) allows it.
+	DelegationPolicyIfAllowed
+)
+
+// DefaultDelegationPolicy is the default delegation policy used for new clients.
+var DefaultDelegationPolicy DelegationPolicy = DelegationPolicyNever
+
 // GSSAPITransport is a http.RoundTripper implementation that includes GSSAPI
 // (HTTP Negotiate) authentication.
 type GSSAPITransport struct {
@@ -29,9 +52,10 @@ type GSSAPITransport struct {
 	provider           gssapi.Provider
 	credential         gssapi.Credential
 	spnFunc            SpnFunc
-	opportunistic      bool
+	opportunisticFunc  OpportunisticFunc
+	delegationPolicy   DelegationPolicy
 	mutual             bool
-	expect100Threshold uint32
+	expect100Threshold int64
 
 	httpLogging bool
 	logFunc     func(format string, args ...interface{})
@@ -49,7 +73,15 @@ type ClientOption func(c *GSSAPITransport)
 // potentially exposing authentcation credentials to the server unnecessarily.
 func WithOpportunistic() ClientOption {
 	return func(c *GSSAPITransport) {
-		c.opportunistic = true
+		c.opportunisticFunc = opportunisticsFuncAlways
+	}
+}
+
+// WithOpportunisticFunc configures the client to use a custom function to determine
+// if opportunistic authentication should be used for a given URL.
+func WithOpportunisticFunc(opportunisticFunc OpportunisticFunc) ClientOption {
+	return func(c *GSSAPITransport) {
+		c.opportunisticFunc = opportunisticFunc
 	}
 }
 
@@ -80,12 +112,19 @@ func WithSpnFunc(spnFunc SpnFunc) ClientOption {
 	}
 }
 
+// WithDelegationPolicy configures the client to use a custom credential delegation policy.
+func WithDelegationPolicy(delegationPolicy DelegationPolicy) ClientOption {
+	return func(c *GSSAPITransport) {
+		c.delegationPolicy = delegationPolicy
+	}
+}
+
 // WithExpect100Threshold configures the client to use the Expect: Continue header
 // if the request body is larger than the threshold.
 //
-// The default threshold is 4kb.  Setting the threshold to 0 means that the client will not use the
-// Expect: Continue header.
-func WithExpect100Threshold(threshold uint32) ClientOption {
+// Use of the Expect: Continue header is disabled by default due to concerns about the
+// correct implementation by some servers.
+func WithExpect100Threshold(threshold int64) ClientOption {
 	return func(c *GSSAPITransport) {
 		c.expect100Threshold = threshold
 	}
@@ -113,13 +152,18 @@ func WithLogFunc(logFunc func(format string, args ...interface{})) ClientOption 
 	}
 }
 
-func NewTransport(provider gssapi.Provider, options ...ClientOption) http.RoundTripper {
+// NewTransport creates a new GSSAPI transport with the given provider and options.
+//
+// The transport is a wrapper around the standard [http.Transport] that adds GSSAPI
+// authentication support. By default it wraps [http.DefaultTransport] - this can be
+// overridden by passing a custom round tripper with [WithRoundTripper].
+func NewTransport(provider gssapi.Provider, options ...ClientOption) *GSSAPITransport {
 	dt := http.DefaultTransport.(*http.Transport)
 	dt.MaxConnsPerHost = 1
 	t := &GSSAPITransport{
-		transport:          http.DefaultTransport,
-		provider:           provider,
-		expect100Threshold: 4096,
+		transport:        http.DefaultTransport,
+		provider:         provider,
+		delegationPolicy: DefaultDelegationPolicy,
 	}
 	for _, option := range options {
 		option(t)
@@ -130,6 +174,11 @@ func NewTransport(provider gssapi.Provider, options ...ClientOption) http.RoundT
 	return t
 }
 
+// NewClient returns a [http.Client] that uses [GSSAPITransport] to enable GSSAPI authentication.
+//
+// If an existing client is provided, it will be copied and the [http.RoundTripper] will be replaced with a
+// new [GSSAPITransport].  Otherwise the default [http.Client] will be used. The [http.RoundTripper] in the
+// returned client will wrap the transport from the supplied client or [http.DefaultTransport].
 func NewClient(provider gssapi.Provider, client *http.Client, options ...ClientOption) *http.Client {
 	if client == nil {
 		client = http.DefaultClient
@@ -145,7 +194,7 @@ func NewClient(provider gssapi.Provider, client *http.Client, options ...ClientO
 	return &newClient
 }
 
-func (t *GSSAPITransport) setInitialToken(req *http.Request) (gssapi.SecContext, error) {
+func (t *GSSAPITransport) initSecContext(req *http.Request) (gssapi.SecContext, error) {
 	spn := t.spnFunc(*req.URL)
 	spnName, err := t.provider.ImportName(spn, gssapi.GSS_NT_HOSTBASED_SERVICE)
 	if err != nil {
@@ -159,6 +208,12 @@ func (t *GSSAPITransport) setInitialToken(req *http.Request) (gssapi.SecContext,
 		// optionally request mutual authentication
 		flags |= gssapi.ContextFlagMutual
 	}
+	switch t.delegationPolicy {
+	case DelegationPolicyAlways:
+		flags |= gssapi.ContextFlagDeleg
+	case DelegationPolicyIfAllowed:
+		flags |= gssapi.ContextFlagDelegPolicy
+	}
 
 	opts := []gssapi.InitSecContextOption{
 		gssapi.WithInitiatorFlags(flags),
@@ -168,14 +223,30 @@ func (t *GSSAPITransport) setInitialToken(req *http.Request) (gssapi.SecContext,
 	if err != nil {
 		return nil, err
 	}
-	token, _, err := secCtx.Continue(nil)
+
+	return secCtx, nil
+}
+
+func (t *GSSAPITransport) continueSecContext(secCtx gssapi.SecContext, inToken string, req *http.Request) (*gssapi.SecContextInfoPartial, error) {
+	var rawInToken []byte
+	var err error
+	if inToken != "" {
+		rawInToken, err = base64.StdEncoding.DecodeString(inToken)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	outToken, info, err := secCtx.Continue(rawInToken)
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("Authorization", "Negotiate "+base64.StdEncoding.EncodeToString(token))
+	if outToken != nil {
+		req.Header.Set("Authorization", "Negotiate "+base64.StdEncoding.EncodeToString(outToken))
+	}
 
-	return secCtx, nil
+	return &info, nil
 }
 
 // Use the underlying transport's RoundTripper wrapped in HTTP logging
@@ -202,16 +273,23 @@ func (t *GSSAPITransport) roundTrip(req *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
+// RoundTrip implements the [http.RoundTripper] interface and performs one HTTP
+// request, including potentially multiple round-trips to the server to complete the
+// GSSAPI context establishment.
 func (t *GSSAPITransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if t.httpLogging {
 		req = t.setupLogging(req)
 	}
 
-	var secCtx gssapi.SecContext
-	var err error
+	var info *gssapi.SecContextInfoPartial = nil
 
 	// We are not meant to modify the request, so we need to create a new one
 	req = req.Clone(req.Context())
+
+	secCtx, err := t.initSecContext(req)
+	if err != nil {
+		return nil, err
+	}
 
 	defer func() {
 		if secCtx != nil {
@@ -219,24 +297,16 @@ func (t *GSSAPITransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		}
 	}()
 
-	// Preemptively set the initial token if opportunistic authentication is requested
-	if t.opportunistic {
-		secCtx, err = t.setInitialToken(req)
-		if err != nil {
-			return nil, err
-		}
-	}
+	// Should we opportunistically set the initial token?
+	useOpportunistic := t.opportunisticFunc != nil && t.opportunisticFunc(*req.URL)
 
-	// use Expect: Continue for large requests or if we can't rewind the body
-	// This causes the server to close the connection if it needs to send a 401 response, so we don't want to
-	// always use this.
-	if t.expect100Threshold > 0 && !t.opportunistic {
+	// use Expect: Continue for large requests or if we can't rewind the body, when we're not doing opportunistic authentication
+	if !useOpportunistic && t.expect100Threshold > 0 {
 		useExpect100 := false
-		if req.ContentLength > int64(t.expect100Threshold) {
+		if req.ContentLength > t.expect100Threshold {
 			t.logFunc("Using Expect: Continue header because request body is larger than %d bytes", t.expect100Threshold)
 			useExpect100 = true
-		}
-		if req.GetBody == nil && !t.opportunistic {
+		} else if req.GetBody == nil {
 			t.logFunc("Using Expect: Continue header because request body is not rewindable and opportunistic authentication is not requested")
 			useExpect100 = true
 		}
@@ -245,62 +315,79 @@ func (t *GSSAPITransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		}
 	}
 
-	// Send the request / get a response
-	resp, err := t.roundTrip(req)
-	if err != nil {
-		return nil, err
+	var resp *http.Response = nil
+contextLoop:
+	for {
+		var err error
+		inToken := ""
+
+		// Skip the server round-trip if we are doing opportunistic authentication and haven't started auth yet
+		if !(info == nil && useOpportunistic) {
+			// Send the request / get a response
+			resp, err = t.roundTrip(req)
+			if err != nil {
+				return nil, err
+			}
+
+			// Check for a negotiate challenge in the response - which can be in a 401 or any other final response
+			challenges := findSchemeChallenges(&resp.Header, "Negotiate")
+			switch len(challenges) {
+			default:
+				return nil, fmt.Errorf("multiple negotiate challenges found in response")
+			case 0:
+				// no challenge - the context should be fully established or never have started (eg. URL doesn't need auth)
+				break contextLoop
+			case 1:
+				// one challenge - this is the initial challenge or a subsequent challenge
+				negotiateChallenge := challenges[0]
+
+				// Negotiate doesn't use parameters
+				if len(negotiateChallenge.Parameters) > 0 {
+					return nil, fmt.Errorf("negotiate challenge must not have parameters")
+				}
+
+				// The challenge should have a token unless this is a 401 response
+				if negotiateChallenge.Token68 == "" && resp.StatusCode != 401 {
+					return nil, fmt.Errorf("negotiate challenge must have a token unless this is a 401 response")
+				}
+
+				// The challenege should have a token if we have already started authentication
+				if negotiateChallenge.Token68 == "" && info != nil {
+					return nil, fmt.Errorf("empty challenge received during context establishment")
+				}
+				inToken = negotiateChallenge.Token68
+			}
+		}
+
+		if secCtx.ContinueNeeded() {
+			// leaves any token that needs to be send to the server in the request's Authorization header
+			// which will be sent in the next round trip
+			info, err = t.continueSecContext(secCtx, inToken, req)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			break contextLoop
+		}
 	}
 
-	// Redo the request with an initial token if we didn't already send one opportunistically
-	if resp.StatusCode == 401 && !t.opportunistic {
-		negotiateChallenge, err := FindOneWwwAuthenticateChallenge(&resp.Header, "Negotiate")
-		if err != nil {
-			return nil, err
-		}
-
-		// the challenge must not have a token or parameters
-		if negotiateChallenge.Token68 != "" || len(negotiateChallenge.Parameters) > 0 {
-			return nil, fmt.Errorf("negotiate challenge must not have a token or parameters")
-		}
-
-		secCtx, err = t.setInitialToken(req)
-		if err != nil {
-			return nil, err
-		}
-
-		resp, err = t.roundTrip(req)
-		if err != nil {
-			return nil, err
-		}
+	// If we never started authentication then we should return the response we got
+	if info == nil {
+		return resp, nil
 	}
 
-	// If we are doing mutual auth (which is of dubious value for HTTP), we need to
-	// validate the response token.  At least we can catch a trojan server even if we
-	// will have sent it the request body already.
-	if resp.StatusCode != 401 && t.mutual {
-		negotiateChallenge, err := FindOneWwwAuthenticateChallenge(&resp.Header, "Negotiate")
-		if err != nil {
-			return nil, err
-		}
+	// We started authenticaiton and should be fully established by now
+	if !info.FullyEstablished {
+		return nil, fmt.Errorf("context not fully established")
+	}
 
-		// the challenge must have a token
-		if negotiateChallenge.Token68 == "" {
-			return nil, fmt.Errorf("no response token - required for mutual authentication: %+v / %+v", negotiateChallenge, resp.Header)
-		}
+	// verify that we have the flags we requested
+	if t.mutual && info.Flags&gssapi.ContextFlagMutual == 0 {
+		return nil, fmt.Errorf("mutual authentication requested but not available")
+	}
 
-		rawToken, err := base64.StdEncoding.DecodeString(negotiateChallenge.Token68)
-		if err != nil {
-			return nil, err
-		}
-		_, info, err := secCtx.Continue(rawToken)
-		if err != nil {
-			return nil, err
-		}
-
-		// verify that we have the flags we requested
-		if info.Flags&gssapi.ContextFlagMutual == 0 {
-			return nil, fmt.Errorf("mutual authentication requested but not available")
-		}
+	if t.delegationPolicy == DelegationPolicyAlways && info.Flags&gssapi.ContextFlagDeleg == 0 {
+		return nil, fmt.Errorf("delegation requested but not available")
 	}
 
 	return resp, nil

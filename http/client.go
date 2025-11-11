@@ -161,6 +161,7 @@ func NewTransport(provider gssapi.Provider, options ...ClientOption) *GSSAPITran
 	t := &GSSAPITransport{
 		transport:        http.DefaultTransport,
 		provider:         provider,
+		spnFunc:          DefaultSpnFunc,
 		delegationPolicy: DefaultDelegationPolicy,
 	}
 	for _, option := range options {
@@ -169,6 +170,12 @@ func NewTransport(provider gssapi.Provider, options ...ClientOption) *GSSAPITran
 	if t.httpLogging && t.logFunc == nil {
 		t.httpLogging = false
 	}
+
+	// Can't use GSSAPI with HTTP/2
+	if transport, ok := t.transport.(*http.Transport); ok {
+		transport.ForceAttemptHTTP2 = false
+	}
+
 	return t
 }
 

@@ -364,6 +364,13 @@ contextLoop:
 			if err != nil {
 				return nil, err
 			}
+
+			// We don't need to send anytihng to the server if it didn't challenge us,
+			// as long as we've already got a response (not the first RT of an opportunistic request)
+			if resp != nil && resp.StatusCode != 401 {
+				break contextLoop
+			}
+
 		} else {
 			break contextLoop
 		}

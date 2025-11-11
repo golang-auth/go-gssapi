@@ -57,6 +57,7 @@ func newTestServer(t *testing.T, ignoreMutual bool, cantAccept bool, sendBadAuth
 			// Try to accept the context
 			secCtx, err := ta.lib.AcceptSecContext()
 			if err != nil {
+				t.Logf("Failed to accept context: %v", err)
 				w.WriteHeader(http.StatusUnauthorized)
 				return
 			}
@@ -64,6 +65,7 @@ func newTestServer(t *testing.T, ignoreMutual bool, cantAccept bool, sendBadAuth
 
 			respToken, _, err := secCtx.Continue(authzTokenBytes)
 			if err != nil {
+				t.Logf("Failed to continue context: %v", err)
 				w.WriteHeader(http.StatusUnauthorized)
 				return
 			}

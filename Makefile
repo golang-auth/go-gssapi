@@ -29,8 +29,8 @@ mechs_gen.go: build-tools/gen-gss-mech-oids.go mechs.go
 test:
 	./scripts/gofmt
 	${GO} test -coverprofile=./cover.out -covermode=atomic
-	cd http/tests && ../../scripts/gofmt
-	cd http/tests && ${GO} test
+	cd http/test && ../../scripts/gofmt
+	cd http/test && ${GO} test
 
 .PHONY: lint
 lint: | $(TOOLBIN)/golangci-lint

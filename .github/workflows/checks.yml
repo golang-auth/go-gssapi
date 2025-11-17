@@ -69,7 +69,7 @@ jobs:
       - name: Run tests
         run: |
           go test $pkgs -count 100 -coverprofile=../cover.out -covermode=atomic
-          pushd http/tests
+          pushd http/test
           go test
           popd
 

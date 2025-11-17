@@ -161,6 +161,7 @@ func NewTransport(provider gssapi.Provider, options ...ClientOption) *GSSAPITran
 	t := &GSSAPITransport{
 		transport:        http.DefaultTransport,
 		provider:         provider,
+		spnFunc:          DefaultSpnFunc,
 		delegationPolicy: DefaultDelegationPolicy,
 	}
 	for _, option := range options {
@@ -169,6 +170,12 @@ func NewTransport(provider gssapi.Provider, options ...ClientOption) *GSSAPITran
 	if t.httpLogging && t.logFunc == nil {
 		t.httpLogging = false
 	}
+
+	// Can't use GSSAPI with HTTP/2
+	if transport, ok := t.transport.(*http.Transport); ok {
+		transport.ForceAttemptHTTP2 = false
+	}
+
 	return t
 }
 
@@ -364,6 +371,13 @@ contextLoop:
 			if err != nil {
 				return nil, err
 			}
+
+			// We don't need to send anytihng to the server if it didn't challenge us,
+			// as long as we've already got a response (not the first RT of an opportunistic request)
+			if resp != nil && resp.StatusCode != 401 {
+				break contextLoop
+			}
+
 		} else {
 			break contextLoop
 		}

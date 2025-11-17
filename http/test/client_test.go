@@ -32,6 +32,7 @@ type serverInfo struct {
 	requestedNegotiate bool
 	gotAuthzHeader     bool
 	bodyBytes          int
+	body               []byte
 }
 
 // The test server is a very cut down HTTP server that expects Negotiate authentication
@@ -57,6 +58,7 @@ func newTestServer(t *testing.T, ignoreMutual bool, cantAccept bool, sendBadAuth
 			// Try to accept the context
 			secCtx, err := ta.lib.AcceptSecContext()
 			if err != nil {
+				t.Logf("Failed to accept context: %v", err)
 				w.WriteHeader(http.StatusUnauthorized)
 				return
 			}
@@ -64,6 +66,7 @@ func newTestServer(t *testing.T, ignoreMutual bool, cantAccept bool, sendBadAuth
 
 			respToken, _, err := secCtx.Continue(authzTokenBytes)
 			if err != nil {
+				t.Logf("Failed to continue context: %v", err)
 				w.WriteHeader(http.StatusUnauthorized)
 				return
 			}
@@ -88,7 +91,7 @@ func newTestServer(t *testing.T, ignoreMutual bool, cantAccept bool, sendBadAuth
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
-
+				serverInfo.body = body
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -172,6 +175,10 @@ func TestClient(t *testing.T) {
 			if tt.expectSuccess {
 				assert.NoErrorFatal(err)
 				assert.Equal(tt.expectStatus, resp.StatusCode)
+				if tt.expectStatus == 200 {
+					assert.Equal(si.bodyBytes, len(body))
+					assert.Equal(string(si.body), string(body))
+				}
 			} else {
 				assert.Error(err)
 			}

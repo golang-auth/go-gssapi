@@ -35,16 +35,26 @@ jobs:
         uses: actions/setup-go@v5
         with:
             go-version: 1.25.x
+      - name: Install Ubuntu upackages
+        if: ${{ runner.os == 'Linux'}}
+        run: |
+            sudo apt-get install -y krb5-user libkrb5-dev pkg-config
+    
       - name: Generate test includes
         run: |
-          echo pkgs=$(go list ./... | grep -v /examples/) >> "$GITHUB_ENV"
+          echo pkgs=$(go list ./... | egrep -v '/examples/|/build-tools/') >> "$GITHUB_ENV"
       - name: Generate coverage profile
         run: |
           go test $pkgs -count 100 -coverprofile=cover.out -covermode=atomic
+          pushd http/test
+          go test -coverpkg ../ -coverprofile=cover.out -covermode=atomic
+          popd
+          go run github.com/wadey/gocovmerge@latest ./cover.out ./http/test/cover.out > cover-all.out
+
       - name: Generate report
         run: |
             mkdir -p ./coverage
-            go tool cover -html=cover.out -o coverage/coverage.html
+            go tool cover -html=cover-all.out -o coverage/coverage.html
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact

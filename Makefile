@@ -3,6 +3,8 @@ GO          ?= go
 GOBIN       ?= $(shell go env GOBIN)
 TOOLBIN     := $(current_dir)/toolbin
 
+GOCOVMERGE := 
+
 
 ifeq (${GOBIN},)
 	GOBIN = $(shell go env GOPATH)/bin
@@ -30,21 +32,34 @@ mech_attrs_gen.go: build-tools/gen-gss-mech-attrs/gen-gss-mech-attrs.go mech_att
 http/test/testvecs_gen_test.go: build-tools/mk-test-vectors http/test/common_test.go
 	$(GO) generate http/test/common_test.go
 
+PKGS = $(shell $(GO) list ./... | egrep -v '/examples/|/build-tools/')
 
 .PHONY: test
-test:
-	./scripts/gofmt
-	${GO} test -coverprofile=./cover.out -covermode=atomic
-	cd http/test && ../../scripts/gofmt
-	cd http/test && ${GO} test
+test: $(TOOLBIN)/gocovmerge $(TOOLBIN)/go-test-coverage
+	@echo "==> check code formatting"
+	@./scripts/gofmt
+	@echo "==> run tests for " $(PKGS)
+	@${GO} test $(PKGS) -coverprofile=cover.out -covermode=atomic
+	@echo "==> run tests for http/test"
+	@cd http/test && ${GO} test -coverpkg ../ -coverprofile=cover.out -covermode=atomic
+	@echo "==> procesisng coverage data"
+	@$(TOOLBIN)/gocovmerge ./cover.out ./http/test/cover.out > cover-all.out
+	@go tool cover -html=cover-all.out -o coverage.html
+	@$(TOOLBIN)/go-test-coverage --config .testcoverage.yml
 
 .PHONY: lint
 lint: | $(TOOLBIN)/golangci-lint
 	$(TOOLBIN)/golangci-lint run 
 
 .PHONY: tools
-tools: $(TOOLBIN)/golangci-lint
+tools: $(TOOLBIN)/golangci-lint $(TOOLBIN)/gocovmerge $(TOOLBIN)/go-test-coverage
 	@echo "==> installing required tooling..."
 
-$(TOOLBIN)/golangci-lint: | $(GOENV)
+$(TOOLBIN)/golangci-lint:
 	GOBIN=$(TOOLBIN) GO111MODULE=on $(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@v1
+
+$(TOOLBIN)/gocovmerge:
+	GOBIN=$(TOOLBIN) GO111MODULE=on $(GO) install github.com/wadey/gocovmerge@latest
+
+$(TOOLBIN)/go-test-coverage:
+	GOBIN=$(TOOLBIN) GO111MODULE=on $(GO) install github.com/vladopajic/go-test-coverage/v2@latest

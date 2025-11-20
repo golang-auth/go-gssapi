@@ -62,19 +62,25 @@ jobs:
             uname -a
             if [ -e /etc/os-release ]; then cat /etc/os-release; fi
 
+      - name: Install Ubuntu upackages
+        if: ${{ runner.os == 'Linux'}}
+        run: |
+              sudo apt-get install -y krb5-user libkrb5-dev pkg-config
+
       - name: Generate test includes
         run: |
-          echo pkgs=$(go list ./... | grep -v /examples/) >> "$GITHUB_ENV"
+          echo pkgs=$(go list ./... | egrep -v '/examples/|/build-tools/') >> "$GITHUB_ENV"
 
       - name: Run tests
         run: |
-          go test $pkgs -count 100 -coverprofile=../cover.out -covermode=atomic
+          go test $pkgs -count 100 -coverprofile=cover.out -covermode=atomic
           pushd http/test
-          go test
+          go test -coverpkg ../ -coverprofile=cover.out -covermode=atomic
           popd
+          go run github.com/wadey/gocovmerge@latest ./cover.out ./http/test/cover.out > cover-all.out
 
       - name: Check test coverage
-        if: ${{ runner.os == 'Linux' }}
+        if: ${{ runner.os == 'Linux' && matrix.go-version == '1.25.x'  }}
         uses: jake-scott/go-test-coverage@v1.0.0
         with:
           config: ./.testcoverage.yml

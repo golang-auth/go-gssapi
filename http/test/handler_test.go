@@ -47,3 +47,20 @@ func TestHandler(t *testing.T) {
 	// initiator name would only be available if GSSAPI authenticatinon happned
 	assert.Equal(cliname, initiatorName.PrincipalName)
 }
+
+func TestHandlerNegotiateOnceBadInputToken(t *testing.T) {
+	assert := NewAssert(t)
+	ta.useAsset(t, testKeytabRack|testCredCache)
+
+	handler := ghttp.NewHandler(ta.lib, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// not base 64 encoded
+	_, _, err := handler.NegotiateOnce("Bad Token")
+	assert.Error(err)
+
+	// not a GSSAPI token
+	_, _, err = handler.NegotiateOnce("YmFkIHRva2VuCg==")
+	assert.Error(err)
+}

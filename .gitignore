@@ -6,11 +6,7 @@
 *.dylib
 *.o
 *.class
-
-examples/c/gss-client-c
-examples/c/gss-server-c
-examples/go/gss-client-go
-examples/go/gss-server-go
+*.swp
 
 # Test binary, built with `go test -c`
 *.test
@@ -24,4 +20,5 @@ examples/go/gss-server-go
 #
 toolbin/
 
-v3/cover.out
+cover*.out
+cover*.html

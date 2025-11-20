@@ -87,7 +87,7 @@ func main() {
 	}
 	defer func() {
 		if *output != "" {
-			fh.Close()
+			_ = fh.Close()
 		}
 	}()
 
@@ -98,7 +98,7 @@ func main() {
 	}
 
 	if *output != "" {
-		fh.Close()
+		_ = fh.Close()
 	}
 }
 

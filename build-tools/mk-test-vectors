@@ -1,8 +1,14 @@
-#!/bin/bash -x
+#!/bin/bash
 
 ## This script uses a temporary KDC instance to create test
 #  Kerberos keytabs and a credentials cache for use as test
 #  vectors.
+
+if [[ $(uname -s) != "Linux" ]]
+then
+    echo "This script is only supported on Linux"
+    exit 1
+fi
 
 ## run in a new session so we can kill any stragglers easily
 #

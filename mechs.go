@@ -4,7 +4,7 @@ package gssapi
 
 import "slices"
 
-//go:generate  go run ./build-tools/gen-gss-mech-oids.go -o mechs_gen.go
+//go:generate  go run ./build-tools/gen-gss-mech-oids -o mechs_gen.go
 
 // GssMech describes an available GSSAPI mechanism. GSSAPI mechanisms are identified by unique
 // object identifiers (OIDs). The Go bindings define this interface for working with mechanisms.

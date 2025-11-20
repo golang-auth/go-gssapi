@@ -6,7 +6,7 @@ import (
 	"slices"
 )
 
-//go:generate  go run ./build-tools/gen-gss-name-oids.go -o names_gen.go
+//go:generate  go run ./build-tools/gen-gss-name-oids -o names_gen.go
 
 // GssNameType describes an available GSSAPI Name Type (NT) as described in
 // RFC 2743 § 4.

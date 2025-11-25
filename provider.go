@@ -247,6 +247,9 @@ type Provider interface {
 
 	// HasExtension reports whether a non-standard extension to GSSAPI is available
 	HasExtension(e GssapiExtension) bool
+
+	// Release releases any resources held by the provider.  This method should be called when the provider is no longer needed.
+	Release() error
 }
 
 // ProviderExtRFC5587 extends the Provider interface with RFC 5587 mechanism attribute functionality.

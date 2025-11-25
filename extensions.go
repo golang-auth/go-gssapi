@@ -35,4 +35,6 @@ const (
 	HasExtCredPassword
 	// HasExtKrb5Identity indicates support for confguring the location of Keberos identities (Credentials cache and Keytab)
 	HasExtKrb5Identity
+	// HasExtCredStore indicates support for credential store extensions
+	HasExtCredStore
 )

@@ -2,6 +2,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/golang-auth/go-gssapi-c v0.0.5 h1:yzxbludHe8wY/scDiqmxkiMbJ9S+12x2U3zaztJ05Z8=
 github.com/golang-auth/go-gssapi-c v0.0.5/go.mod h1:954aNWZhA9UCkNotnufTDqGs6qopH+8YzDRyCTdhxcE=
+github.com/golang-auth/go-gssapi-c v0.1.0 h1:ULQOdbh2dZwDpdqt1CHkdvyKL25bRuJ/uipUVymBXao=
+github.com/golang-auth/go-gssapi-c v0.1.0/go.mod h1:2FFJ0C7m4aKGMY5jP1UKR8C4T0OEMUmLdOa1+mTjKcs=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=

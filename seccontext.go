@@ -178,16 +178,11 @@ type SecContext interface {
 	// to process a token from the peer. It is equivalent to calling GSS_Init_sec_context or
 	// GSS_Accept_sec_context on a partially open context.
 	//
-	// The caller should check the result of ContinueNeeded to determine whether the initialization
-	// loop has completed.
-	//
-	// Note:
-	//   Not all members of the SecContextInfoPartial struct are guaranteed to be set during the
-	//   context establishment process, and the values may change as additional facilities are confirmed.
-	//
-	//   It may not be obvious why a caller should make use of the SecContextInfoPartial struct,
-	//   rather than calling Inquire().  The latter will fail if the context has expired and so
-	//   represents a race condition for callers that use GSSAPI purely for authentication purposes.
+	// The caller should check the result of [ContinueNeeded] or the [FullyEstablished] field of the
+	// returned [SecContextInfoPartial] struct to determine whether the initialization
+	// loop has completed from the local perspective.  If completed but the output token is not empty,
+	// the the peer's context is not yet fully established and the caller should send the token to the peer
+	// so that it can complete its security context.
 	//
 	// Parameters:
 	//   - tokIn: Context initialization token received from the peer

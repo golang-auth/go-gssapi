@@ -1,15 +1,6 @@
 current_dir := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 GO          ?= go
-GOBIN       ?= $(shell go env GOBIN)
 TOOLBIN     := $(current_dir)/toolbin
-
-GOCOVMERGE := 
-
-
-ifeq (${GOBIN},)
-	GOBIN = $(shell go env GOPATH)/bin
-endif
-
 
 .DEFAULT: build
 
@@ -56,10 +47,11 @@ tools: $(TOOLBIN)/golangci-lint $(TOOLBIN)/gocovmerge $(TOOLBIN)/go-test-coverag
 	@echo "==> installing required tooling..."
 
 $(TOOLBIN)/golangci-lint:
-	GOBIN=$(TOOLBIN) GO111MODULE=on $(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@v1
+	GOBIN=$(TOOLBIN) GO111MODULE=on $(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2
 
 $(TOOLBIN)/gocovmerge:
 	GOBIN=$(TOOLBIN) GO111MODULE=on $(GO) install github.com/wadey/gocovmerge@latest
 
 $(TOOLBIN)/go-test-coverage:
 	GOBIN=$(TOOLBIN) GO111MODULE=on $(GO) install github.com/vladopajic/go-test-coverage/v2@latest
+

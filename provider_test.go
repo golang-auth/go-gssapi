@@ -13,6 +13,10 @@ type someProvider struct {
 	name string
 }
 
+func (p someProvider) Release() error {
+	return nil
+}
+
 func (p someProvider) Name() string {
 	return p.name
 }

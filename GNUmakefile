@@ -1,6 +1,13 @@
-current_dir := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+ifeq ($(.CURDIR),)
+	current_dir  = $(shell /bin/pwd)
+else
+	current_dir  = $(.CURDIR)
+endif
+
 GO          ?= go
-TOOLBIN     := $(current_dir)/toolbin
+GOOS 		?= $(shell $(GO) env GOOS)
+GOARCH 		?= $(shell $(GO) env GOARCH)
+TOOLBIN 	 = $(current_dir)/toolbin/$(GOOS)_$(GOARCH)
 
 .DEFAULT: build
 

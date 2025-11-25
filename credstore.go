@@ -35,55 +35,55 @@ type CredStore interface {
 	GetOption(option int) (string, bool)
 }
 
-// InitSecContextOption is a function type for configuring InitSecContext options.
-type CredStoreOption func(o CredStore)
+// CredStoreOption is a function type for configuring credential store options.
+type CredStoreOption func(o CredStore) error
 
-// CredStoreCCache is the name of the credential cache to use for aquiring initiator credentials
+// WithCredStoreCCache configures the name of the credential cache to use for aquiring initiator credentials
 func WithCredStoreCCache(cache string) CredStoreOption {
-	return func(s CredStore) {
-		s.SetOption(int(CredStoreCCache), cache)
+	return func(s CredStore) error {
+		return s.SetOption(int(CredStoreCCache), cache)
 	}
 }
 
-// CredStoreClientKeytab is the name of the keytab to use when aquiring initiator credentials,
+// WithCredStoreClientKeytab configures the name of the keytab to use when aquiring initiator credentials,
 // if necessary to refresh the credentials in the ccache.
 func WithCredStoreClientKeytab(keytab string) CredStoreOption {
-	return func(s CredStore) {
-		s.SetOption(int(CredStoreClientKeytab), keytab)
+	return func(s CredStore) error {
+		return s.SetOption(int(CredStoreClientKeytab), keytab)
 	}
 }
 
-// CredStoreServerKeytab is the name of the keytab to use for aquiring acceptor credentials and
+// WithCredStoreServerKeytab configures the name of the keytab to use for aquiring acceptor credentials and
 // for verification of initiator credentials acquired using a password and verified.
 func WithCredStoreServerKeytab(keytab string) CredStoreOption {
-	return func(s CredStore) {
-		s.SetOption(int(CredStoreServerKeytab), keytab)
+	return func(s CredStore) error {
+		return s.SetOption(int(CredStoreServerKeytab), keytab)
 	}
 }
 
-// CredStorePassword can be used when acquiring fresh initiator credentials.  Cannot be used with CredStoreCCache
-// or CredStoreClientKeytab.  Credentials are acquired into into a unique memory credential cache.
+// WithCredStorePassword configures the password to use when acquiring fresh initiator credentials.
+// Cannot be used with CredStoreCCache or CredStoreClientKeytab.
+// Credentials are acquired into into a unique memory credential cache.
 func WithCredStorePassword(password string) CredStoreOption {
-	return func(s CredStore) {
-		s.SetOption(int(CredStorePassword), password)
+	return func(s CredStore) error {
+		return s.SetOption(int(CredStorePassword), password)
 	}
 }
 
-// CredStoreRCache defines the name of the replay cache to use when acquiring acceptor credentials.
+// WithCredStoreRCache configures the name of the replay cache to use when acquiring acceptor credentials.
 func WithCredStoreRCache(rCache string) CredStoreOption {
-	return func(s CredStore) {
-		s.SetOption(int(CredStoreRCache), rCache)
+	return func(s CredStore) error {
+		return s.SetOption(int(CredStoreRCache), rCache)
 	}
 }
 
-// CredStoreVerify causes a ticket to be be obtained from the TGS when acquiring initiator credentials.
+// WithCredStoreVerify configures the ticket to be be obtained from the TGS when acquiring initiator credentials.
 // The ticket is validated using a service key from the keytab specified by CredStoreServerKeytab.
-// The value can be the name of a principal in the keytab or the empty string, which uses any
-// host service principal in the keytab.  The option can be used to validate that credentials
-// were obtained from a trusted KDC.
+// The value can be the name of a principal in the keytab or the empty string, which uses any host service principal in the keytab.
+// The option can be used to validate that credentials were obtained from a trusted KDC.
 func WithCredStoreVerify(principal string) CredStoreOption {
-	return func(s CredStore) {
-		s.SetOption(int(CredStoreVerify), principal)
+	return func(s CredStore) error {
+		return s.SetOption(int(CredStoreVerify), principal)
 	}
 }
 

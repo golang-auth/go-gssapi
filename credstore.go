@@ -132,5 +132,7 @@ type CredentialExtCredStore interface {
 	//   - numElmsStores: the number of elements stored
 	//   - usageStored: the usage of the stored credential
 	//   - err: error if one occurred, otherwise nil
-	StoreInfo(mech GssMech, usage CredUsage, overwrite bool, defaultCred bool, opts ...CredStoreOption) (numElmsStores int, usageStored CredUsage, err error)
+	StoreInto(mech GssMech, usage CredUsage, overwrite bool, defaultCred bool, opts ...CredStoreOption) (mechsStored []GssMech, usageStored CredUsage, err error)
+
+	AddFrom(name GssName, mech GssMech, usage CredUsage, initiatorLifetime *GssLifetime, acceptorLifetime *GssLifetime, mutate bool, opts ...CredStoreOption) (Credential, error)
 }

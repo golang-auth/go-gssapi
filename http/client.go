@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/golang-auth/go-gssapi/v3"
 )
@@ -193,6 +194,15 @@ func NewTransport(provider gssapi.Provider, options ...ClientOption) (*GSSAPITra
 
 		// Can't use GSSAPI with HTTP/2
 		transport.ForceAttemptHTTP2 = false
+
+		// zero causes continue requests to fail
+		if transport.ExpectContinueTimeout == 0 {
+			if defTrans, ok := http.DefaultTransport.(*http.Transport); ok {
+				transport.ExpectContinueTimeout = defTrans.ExpectContinueTimeout
+			} else {
+				transport.ExpectContinueTimeout = time.Second
+			}
+		}
 
 		t.transport = transport
 	}

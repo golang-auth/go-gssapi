@@ -39,7 +39,7 @@ type serverInfo struct {
 // mess up the response if told to do so.
 func newTestServer(t *testing.T, ignoreMutual bool, cantAccept bool, sendBadAuthzHeader bool, serverInfo *serverInfo) *httptest.Server {
 
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authzType, authzToken := parseAuthzHeader(&r.Header)
 		if authzType == "Negotiate" && len(authzToken) > 0 {
 			serverInfo.gotAuthzHeader = true
@@ -259,8 +259,7 @@ func TestClient100Continue(t *testing.T) {
 			trace := &ghttp.HttpTrace{}
 			req = req.WithContext(ghttp.WithHttpTrace(req.Context(), trace))
 
-			client := ts.Client()
-			client, err = ghttp.NewClient(ta.lib, client, opts...)
+			client, err := ghttp.NewClient(ta.lib, ts.Client(), opts...)
 			assert.NoErrorFatal(err)
 			resp, err := client.Do(req)
 			if tt.expectError {

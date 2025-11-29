@@ -42,6 +42,14 @@ func (a *myassert) NoErrorFatal(err error) {
 	}
 }
 
+func (a *myassert) NotNilFatal(obj interface{}) {
+	a.NotNil(obj)
+	if obj == nil {
+		a.t.Logf("Stopping test %s due to fatal error", a.t.Name())
+		a.t.FailNow()
+	}
+}
+
 func NewAssert(t *testing.T) *myassert {
 	a := assert.New(t)
 	return &myassert{a, t}

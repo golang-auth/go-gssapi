@@ -5,6 +5,7 @@ package http
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"net/http"
 
 	"github.com/golang-auth/go-gssapi/v3"
@@ -40,9 +41,11 @@ func GetInitiatorName(r *http.Request) (*InitiatorName, bool) {
 
 // Handler is a http.Handler that performs GSSAPI authentication and passes the initiator name to the next handler
 type Handler struct {
-	provider   gssapi.Provider
-	credential gssapi.Credential
-	next       http.Handler
+	provider               gssapi.Provider
+	credential             gssapi.Credential
+	credentialStoreOptions []gssapi.CredStoreOption
+
+	next http.Handler
 }
 
 // HandlerOption is a function that can be used to configure the Handler
@@ -52,6 +55,16 @@ type HandlerOption func(s *Handler)
 func WithAcceptorCredential(credential gssapi.Credential) HandlerOption {
 	return func(s *Handler) {
 		s.credential = credential
+	}
+}
+
+// WithCredentialStoreOptions configures the client to use a custom credential store to
+// acquire acceptor credentials.  Overrides any credentials provided with [WithAcceptorCredential].
+//
+// This option can be used to configure the keytab used by the handler.
+func WithAcceptorCredentialStoreOptions(opts ...gssapi.CredStoreOption) HandlerOption {
+	return func(s *Handler) {
+		s.credentialStoreOptions = append(s.credentialStoreOptions, opts...)
 	}
 }
 
@@ -103,9 +116,28 @@ func (h *Handler) NegotiateOnce(negotiateToken string) (string, *InitiatorName, 
 	}
 
 	opts := []gssapi.AcceptSecContextOption{}
-	if h.credential != nil {
+
+	var ownedCred gssapi.Credential
+	if len(h.credentialStoreOptions) > 0 {
+		if provider, ok := h.provider.(gssapi.ProviderExtCredStore); ok {
+			ownedCred, err = provider.AcquireCredentialFrom(nil, nil, gssapi.CredUsageAcceptOnly, nil, h.credentialStoreOptions...)
+			if err != nil {
+				return "", nil, err
+			}
+			opts = append(opts, gssapi.WithAcceptorCredential(ownedCred))
+		} else {
+			return "", nil, fmt.Errorf("provider does not support credential store options")
+		}
+	} else if h.credential != nil {
 		opts = append(opts, gssapi.WithAcceptorCredential(h.credential))
 	}
+
+	defer func() {
+		if ownedCred != nil {
+			ownedCred.Release() //nolint:errcheck
+		}
+	}()
+
 	secCtx, err := h.provider.AcceptSecContext(opts...)
 	if err != nil {
 		return "", nil, err

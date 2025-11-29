@@ -57,8 +57,9 @@ type GSSAPITransport struct {
 	mutual             bool
 	expect100Threshold int64
 
-	httpLogging bool
-	logFunc     func(format string, args ...interface{})
+	httpLogging            bool
+	logFunc                func(format string, args ...interface{})
+	credentialStoreOptions []gssapi.CredStoreOption
 }
 
 // ClientOption is a function that configures a Client
@@ -100,6 +101,17 @@ func WithMutual() ClientOption {
 func WithCredential(cred gssapi.Credential) ClientOption {
 	return func(c *GSSAPITransport) {
 		c.credential = cred
+	}
+}
+
+// WithCredentialStoreOptions configures the client to use a custom credential store to
+// acquire initiator credentials.  Overrides any credentials provided with [WithCredential].
+//
+// This option can be used to configure a credential cache/client keytab for the client to
+// acquire initiator credentials.
+func WithCredentialStoreOptions(opts ...gssapi.CredStoreOption) ClientOption {
+	return func(c *GSSAPITransport) {
+		c.credentialStoreOptions = append(c.credentialStoreOptions, opts...)
 	}
 }
 
@@ -199,7 +211,22 @@ func NewClient(provider gssapi.Provider, client *http.Client, options ...ClientO
 	return &newClient
 }
 
-func (t *GSSAPITransport) initSecContext(req *http.Request) (gssapi.SecContext, error) {
+type secContext struct {
+	secCtx    gssapi.SecContext
+	ownedCred gssapi.Credential
+}
+
+func (s *secContext) Delete() (token []byte, err error) {
+	defer func() {
+		if s.ownedCred != nil {
+			s.ownedCred.Release() //nolint:errcheck
+		}
+	}()
+
+	return s.secCtx.Delete()
+}
+
+func (t *GSSAPITransport) initSecContext(req *http.Request) (*secContext, error) {
 	spn := t.spnFunc(*req.URL)
 	spnName, err := t.provider.ImportName(spn, gssapi.GSS_NT_HOSTBASED_SERVICE)
 	if err != nil {
@@ -224,12 +251,27 @@ func (t *GSSAPITransport) initSecContext(req *http.Request) (gssapi.SecContext, 
 		gssapi.WithInitiatorFlags(flags),
 	}
 
+	var ownedCred gssapi.Credential = nil
+	if len(t.credentialStoreOptions) > 0 {
+		if provider, ok := t.provider.(gssapi.ProviderExtCredStore); ok {
+			ownedCred, err := provider.AcquireCredentialFrom(nil, nil, gssapi.CredUsageInitiateOnly, nil, t.credentialStoreOptions...)
+			if err != nil {
+				return nil, err
+			}
+			opts = append(opts, gssapi.WithInitiatorCredential(ownedCred))
+		} else {
+			return nil, fmt.Errorf("provider does not support credential store options")
+		}
+	} else if t.credential != nil {
+		opts = append(opts, gssapi.WithInitiatorCredential(t.credential))
+	}
+
 	secCtx, err := t.provider.InitSecContext(spnName, opts...)
 	if err != nil {
 		return nil, err
 	}
 
-	return secCtx, nil
+	return &secContext{secCtx: secCtx, ownedCred: ownedCred}, nil
 }
 
 func (t *GSSAPITransport) continueSecContext(secCtx gssapi.SecContext, inToken string, req *http.Request) (*gssapi.SecContextInfoPartial, error) {
@@ -364,10 +406,10 @@ contextLoop:
 			}
 		}
 
-		if secCtx.ContinueNeeded() {
+		if secCtx.secCtx.ContinueNeeded() {
 			// leaves any token that needs to be send to the server in the request's Authorization header
 			// which will be sent in the next round trip
-			info, err = t.continueSecContext(secCtx, inToken, req)
+			info, err = t.continueSecContext(secCtx.secCtx, inToken, req)
 			if err != nil {
 				return nil, err
 			}

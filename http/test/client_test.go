@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	gssapi "github.com/golang-auth/go-gssapi/v3"
 	ghttp "github.com/golang-auth/go-gssapi/v3/http"
 )
 
@@ -281,4 +282,39 @@ func TestClient100Continue(t *testing.T) {
 		})
 	}
 
+}
+
+func TestClientCredentialStoreOptions(t *testing.T) {
+	if !ta.lib.HasExtension(gssapi.HasExtCredStore) {
+		t.Skip("provider does not support credential store options")
+	}
+	assert := NewAssert(t)
+
+	// well behaved server
+	si := serverInfo{}
+	ts := newTestServer(t, false, false, false, &si)
+	defer ts.Close()
+
+	// test with an empty credential cache, should fail
+	ta.useAsset(t, testNoCredCache|testKeytabRack)
+	opts := []ghttp.ClientOption{
+		ghttp.WithSpnFunc(func(url url.URL) string {
+			return "HTTP@foo.golang-auth.io"
+		}),
+		ghttp.WithOpportunistic(),
+	}
+	cli := ghttp.NewClient(ta.lib, nil, opts...)
+	resp, err := cli.Get(ts.URL)
+	assert.Error(err)
+	assert.Nil(resp)
+
+	// point to the ccache (not the filename used as KRB5CCNAME)
+	opts = append(opts, ghttp.WithCredentialStoreOptions(
+		gssapi.WithCredStoreCCache(ta.ccfile),
+	))
+	cli = ghttp.NewClient(ta.lib, nil, opts...)
+	resp, err = cli.Get(ts.URL)
+	assert.NoErrorFatal(err)
+	assert.NotNilFatal(resp)
+	assert.Equal(http.StatusOK, resp.StatusCode)
 }

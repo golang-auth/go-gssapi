@@ -3,6 +3,7 @@ module golang-auth/go-gssapi/v3/http/test
 go 1.24
 
 replace github.com/golang-auth/go-gssapi/v3 => ../../
+replace github.com/golang-auth/go-channelbinding => ../../../go-channelbinding
 
 require (
 	github.com/golang-auth/go-gssapi-c v0.1.0
@@ -12,6 +13,7 @@ require (
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/golang-auth/go-channelbinding v1.0.4 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

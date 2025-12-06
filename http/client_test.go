@@ -10,10 +10,11 @@ import (
 	"github.com/golang-auth/go-gssapi/v3/test"
 )
 
-func TestWithOpportunistic(t *testing.T) {
+func TestInitiatorWithOpportunistic(t *testing.T) {
 	assert := test.NewAssert(t)
-	transport := NewTransport(nil)
-	opt := WithOpportunistic()
+	transport, err := NewTransport(nil)
+	assert.NoErrorFatal(err)
+	opt := WithInitiatorOpportunistic()
 	opt(transport)
 
 	f1 := reflect.ValueOf(opportunisticsFuncAlways).Pointer()
@@ -21,10 +22,11 @@ func TestWithOpportunistic(t *testing.T) {
 	assert.Equal(f1, f2)
 }
 
-func TestWithOpportunisticFunc(t *testing.T) {
+func TestInitiatorWithOpportunisticFunc(t *testing.T) {
 	assert := test.NewAssert(t)
-	transport := NewTransport(nil)
-	opt := WithOpportunisticFunc(func(url url.URL) bool {
+	transport, err := NewTransport(nil)
+	assert.NoErrorFatal(err)
+	opt := WithInitiatorOpportunisticFunc(func(url url.URL) bool {
 		return url.Host == "example.com"
 	})
 	opt(transport)
@@ -33,75 +35,92 @@ func TestWithOpportunisticFunc(t *testing.T) {
 	assert.False(transport.opportunisticFunc(url.URL{Host: "blah.com"}))
 }
 
-func TestWithMutual(t *testing.T) {
+func TestInitiatorWithMutual(t *testing.T) {
 	assert := test.NewAssert(t)
-	transport := NewTransport(nil)
-	opt := WithMutual()
+	transport, err := NewTransport(nil)
+	assert.NoErrorFatal(err)
+	opt := WithInitiatorMutual()
 	opt(transport)
 	assert.True(transport.mutual)
 }
 
-func TestWithCredential(t *testing.T) {
+func TestInitiatorWithCredential(t *testing.T) {
 	assert := test.NewAssert(t)
-	transport := NewTransport(nil)
-	opt := WithCredential(nil)
+	transport, err := NewTransport(nil)
+	assert.NoErrorFatal(err)
+	opt := WithInitiatorCredential(nil)
 	opt(transport)
 	assert.Nil(transport.credential)
 }
 
-func TestWithSpnFunc(t *testing.T) {
+func TestInitiatorWithSpnFunc(t *testing.T) {
 	assert := test.NewAssert(t)
-	transport := NewTransport(nil)
-	opt := WithSpnFunc(func(url url.URL) string {
+	transport, err := NewTransport(nil)
+	assert.NoErrorFatal(err)
+	opt := WithInitiatorSpnFunc(func(url url.URL) string {
 		return "XXX@" + url.Host
 	})
 	opt(transport)
 	assert.Equal("XXX@example.com", transport.spnFunc(url.URL{Host: "example.com"}))
 }
 
-func TestWithDelegationPolicy(t *testing.T) {
+func TestInitiatorWithDelegationPolicy(t *testing.T) {
 	assert := test.NewAssert(t)
-	transport := NewTransport(nil)
-	opt := WithDelegationPolicy(DelegationPolicyAlways)
+	transport, err := NewTransport(nil)
+	assert.NoErrorFatal(err)
+	opt := WithIniiatorDelegationPolicy(DelegationPolicyAlways)
 	opt(transport)
 	assert.Equal(DelegationPolicyAlways, transport.delegationPolicy)
 }
 
-func TestWithExpect100Threshold(t *testing.T) {
+func TestInitiatorWithExpect100Threshold(t *testing.T) {
 	assert := test.NewAssert(t)
-	transport := NewTransport(nil)
-	opt := WithExpect100Threshold(100)
+	transport, err := NewTransport(nil)
+	assert.NoErrorFatal(err)
+	opt := WithInitiatorExpect100Threshold(100)
 	opt(transport)
 	assert.Equal(int64(100), transport.expect100Threshold)
 }
 
-func TestWithRoundTripper(t *testing.T) {
+func TestInitiatorWithRoundTripper(t *testing.T) {
 	assert := test.NewAssert(t)
-	transport := NewTransport(nil)
-	opt := WithRoundTripper(&http.Transport{})
+	transport, err := NewTransport(nil)
+	assert.NoErrorFatal(err)
+	opt := WithInitiatorRoundTripper(&http.Transport{})
 	opt(transport)
 	assert.Equal(&http.Transport{}, transport.transport)
 }
 
-func TestWithHttpLogging(t *testing.T) {
+func TestInititorWithHttpLogging(t *testing.T) {
 	assert := test.NewAssert(t)
-	transport := NewTransport(nil)
-	opt := WithHttpLogging()
+	transport, err := NewTransport(nil)
+	assert.NoErrorFatal(err)
+	opt := WithInititorHttpLogging()
 	opt(transport)
 	assert.True(transport.httpLogging)
 }
 
-func TestWithLogFunc(t *testing.T) {
+func TestInitiatorWithLogFunc(t *testing.T) {
 	assert := test.NewAssert(t)
-	transport := NewTransport(nil)
+	transport, err := NewTransport(nil)
+	assert.NoErrorFatal(err)
 
 	msg := ""
 	logFunc := func(format string, args ...interface{}) {
 		msg = fmt.Sprintf(format, args...)
 	}
-	opt := WithLogFunc(logFunc)
+	opt := WithInitiatorLogFunc(logFunc)
 	opt(transport)
 
 	transport.logFunc("test")
 	assert.Equal("test", msg)
+}
+
+func TestInitiatorWithChannelBindingDisposition(t *testing.T) {
+	assert := test.NewAssert(t)
+	transport, err := NewTransport(nil)
+	assert.NoErrorFatal(err)
+	opt := WithInitiatorChannelBindingDisposition(ChannelBindingDispositionRequire)
+	opt(transport)
+	assert.Equal(ChannelBindingDispositionRequire, transport.channelBindingDisposition)
 }

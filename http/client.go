@@ -3,7 +3,9 @@
 package http
 
 import (
+	"crypto/tls"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -49,13 +51,14 @@ var DefaultDelegationPolicy DelegationPolicy = DelegationPolicyNever
 type GSSAPITransport struct {
 	transport http.RoundTripper
 
-	provider           gssapi.Provider
-	credential         gssapi.Credential
-	spnFunc            SpnFunc
-	opportunisticFunc  OpportunisticFunc
-	delegationPolicy   DelegationPolicy
-	mutual             bool
-	expect100Threshold int64
+	provider                  gssapi.Provider
+	credential                gssapi.Credential
+	spnFunc                   SpnFunc
+	opportunisticFunc         OpportunisticFunc
+	delegationPolicy          DelegationPolicy
+	mutual                    bool
+	channelBindingDisposition ChannelBindingDisposition
+	expect100Threshold        int64
 
 	httpLogging bool
 	logFunc     func(format string, args ...interface{})
@@ -71,7 +74,7 @@ type ClientOption func(c *GSSAPITransport)
 // is a performance optimization that can be used to reduce the number of round trips
 // between the client and server, at the cost of initializing the GSSAPI context and
 // potentially exposing authentcation credentials to the server unnecessarily.
-func WithOpportunistic() ClientOption {
+func WithInitiatorOpportunistic() ClientOption {
 	return func(c *GSSAPITransport) {
 		c.opportunisticFunc = opportunisticsFuncAlways
 	}
@@ -79,7 +82,7 @@ func WithOpportunistic() ClientOption {
 
 // WithOpportunisticFunc configures the client to use a custom function to determine
 // if opportunistic authentication should be used for a given URL.
-func WithOpportunisticFunc(opportunisticFunc OpportunisticFunc) ClientOption {
+func WithInitiatorOpportunisticFunc(opportunisticFunc OpportunisticFunc) ClientOption {
 	return func(c *GSSAPITransport) {
 		c.opportunisticFunc = opportunisticFunc
 	}
@@ -90,14 +93,14 @@ func WithOpportunisticFunc(opportunisticFunc OpportunisticFunc) ClientOption {
 // Mutual authentication means that the client and server both authenticate each other.
 // It causes the server to respond with a GSSAPI authentication token in the Authorization header
 // that the client can use to complete the context establishment and verify the server's identity.
-func WithMutual() ClientOption {
+func WithInitiatorMutual() ClientOption {
 	return func(c *GSSAPITransport) {
 		c.mutual = true
 	}
 }
 
 // WithCredential configures the client to use a specific credential
-func WithCredential(cred gssapi.Credential) ClientOption {
+func WithInitiatorCredential(cred gssapi.Credential) ClientOption {
 	return func(c *GSSAPITransport) {
 		c.credential = cred
 	}
@@ -106,14 +109,14 @@ func WithCredential(cred gssapi.Credential) ClientOption {
 // WithSpnFunc provides a custom function to provide the Service Principal Name (SPN) for a given URL.
 //
 // The default uses "HTTP@" + the host name of the URL.
-func WithSpnFunc(spnFunc SpnFunc) ClientOption {
+func WithInitiatorSpnFunc(spnFunc SpnFunc) ClientOption {
 	return func(c *GSSAPITransport) {
 		c.spnFunc = spnFunc
 	}
 }
 
 // WithDelegationPolicy configures the client to use a custom credential delegation policy.
-func WithDelegationPolicy(delegationPolicy DelegationPolicy) ClientOption {
+func WithIniiatorDelegationPolicy(delegationPolicy DelegationPolicy) ClientOption {
 	return func(c *GSSAPITransport) {
 		c.delegationPolicy = delegationPolicy
 	}
@@ -124,14 +127,14 @@ func WithDelegationPolicy(delegationPolicy DelegationPolicy) ClientOption {
 //
 // Use of the Expect: Continue header is disabled by default due to concerns about the
 // correct implementation by some servers.
-func WithExpect100Threshold(threshold int64) ClientOption {
+func WithInitiatorExpect100Threshold(threshold int64) ClientOption {
 	return func(c *GSSAPITransport) {
 		c.expect100Threshold = threshold
 	}
 }
 
 // WithRoundTripper configures the client to use a custom round tripper
-func WithRoundTripper(transport http.RoundTripper) ClientOption {
+func WithInitiatorRoundTripper(transport http.RoundTripper) ClientOption {
 	return func(c *GSSAPITransport) {
 		c.transport = transport
 	}
@@ -139,16 +142,23 @@ func WithRoundTripper(transport http.RoundTripper) ClientOption {
 
 // WithHttpLogging configures the client to log the HTTP requests and responses
 // Does nothing without a log function
-func WithHttpLogging() ClientOption {
+func WithInititorHttpLogging() ClientOption {
 	return func(c *GSSAPITransport) {
 		c.httpLogging = true
 	}
 }
 
 // WithLogFunc configures the client to use a custom log function
-func WithLogFunc(logFunc func(format string, args ...interface{})) ClientOption {
+func WithInitiatorLogFunc(logFunc func(format string, args ...interface{})) ClientOption {
 	return func(c *GSSAPITransport) {
 		c.logFunc = logFunc
+	}
+}
+
+// WithChannelBindingDisposition configures how the client handles channel binding.
+func WithInitiatorChannelBindingDisposition(disposition ChannelBindingDisposition) ClientOption {
+	return func(c *GSSAPITransport) {
+		c.channelBindingDisposition = disposition
 	}
 }
 
@@ -157,7 +167,7 @@ func WithLogFunc(logFunc func(format string, args ...interface{})) ClientOption 
 // The transport is a wrapper around the standard [http.Transport] that adds GSSAPI
 // authentication support. By default it wraps [http.DefaultTransport] - this can be
 // overridden by passing a custom round tripper with [WithRoundTripper].
-func NewTransport(provider gssapi.Provider, options ...ClientOption) *GSSAPITransport {
+func NewTransport(provider gssapi.Provider, options ...ClientOption) (*GSSAPITransport, error) {
 	t := &GSSAPITransport{
 		transport:        http.DefaultTransport,
 		provider:         provider,
@@ -171,12 +181,23 @@ func NewTransport(provider gssapi.Provider, options ...ClientOption) *GSSAPITran
 		t.httpLogging = false
 	}
 
-	// Can't use GSSAPI with HTTP/2
-	if transport, ok := t.transport.(*http.Transport); ok {
-		transport.ForceAttemptHTTP2 = false
+	// It is only possible to tell the difference between no channel binndings and a successful match
+	// when the GCC_C_CHANNEL_BOUND_FLAG is available.
+	if t.channelBindingDisposition == ChannelBindingDispositionRequire &&
+		!provider.HasExtension(gssapi.HasExtChannelBindingSignalling) {
+		return nil, errors.New("Channel bound GGSSAPI signalling extension unavailable: cannot require channel bindings")
 	}
 
-	return t
+	if transport, ok := t.transport.(*http.Transport); ok {
+		transport = transport.Clone()
+
+		// Can't use GSSAPI with HTTP/2
+		transport.ForceAttemptHTTP2 = false
+
+		t.transport = transport
+	}
+
+	return t, nil
 }
 
 // NewClient returns a [http.Client] that uses [GSSAPITransport] to enable GSSAPI authentication.
@@ -184,22 +205,27 @@ func NewTransport(provider gssapi.Provider, options ...ClientOption) *GSSAPITran
 // If an existing client is provided, it will be copied and the [http.RoundTripper] will be replaced with a
 // new [GSSAPITransport].  Otherwise the default [http.Client] will be used. The [http.RoundTripper] in the
 // returned client will wrap the transport from the supplied client or [http.DefaultTransport].
-func NewClient(provider gssapi.Provider, client *http.Client, options ...ClientOption) *http.Client {
+func NewClient(provider gssapi.Provider, client *http.Client, options ...ClientOption) (*http.Client, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
 
 	if client.Transport != nil {
-		options = append(options, WithRoundTripper(client.Transport))
+		options = append(options, WithInitiatorRoundTripper(client.Transport))
 	}
 
 	// Copy the client to avoid modifying the original
 	newClient := *client
-	newClient.Transport = NewTransport(provider, options...)
-	return &newClient
+
+	var err error
+	newClient.Transport, err = NewTransport(provider, options...)
+	if err != nil {
+		return nil, err
+	}
+	return &newClient, nil
 }
 
-func (t *GSSAPITransport) initSecContext(req *http.Request) (gssapi.SecContext, error) {
+func (t *GSSAPITransport) initSecContext(req *http.Request, tlsState *tls.ConnectionState) (gssapi.SecContext, error) {
 	spn := t.spnFunc(*req.URL)
 	spnName, err := t.provider.ImportName(spn, gssapi.GSS_NT_HOSTBASED_SERVICE)
 	if err != nil {
@@ -220,9 +246,21 @@ func (t *GSSAPITransport) initSecContext(req *http.Request) (gssapi.SecContext, 
 		flags |= gssapi.ContextFlagDelegPolicy
 	}
 
-	opts := []gssapi.InitSecContextOption{
-		gssapi.WithInitiatorFlags(flags),
+	opts := []gssapi.InitSecContextOption{}
+
+	if t.channelBindingDisposition != ChannelBindingDispositionIgnore {
+		binding, err := krbEndpointBinding(tlsState, nil)
+		if err != nil {
+			return nil, fmt.Errorf("initiator channel binding: %w", err)
+		}
+		opts = append(opts, gssapi.WithInitiatorChannelBinding(binding))
+
+		if t.channelBindingDisposition == ChannelBindingDispositionRequire {
+			flags |= gssapi.ContextFlagChannelBound
+		}
 	}
+
+	opts = append(opts, gssapi.WithInitiatorFlags(flags))
 
 	secCtx, err := t.provider.InitSecContext(spnName, opts...)
 	if err != nil {
@@ -287,14 +325,11 @@ func (t *GSSAPITransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	var info *gssapi.SecContextInfoPartial = nil
+	var tlsConnState *tls.ConnectionState = nil
+	var secCtx gssapi.SecContext = nil
 
 	// We are not meant to modify the request, so we need to create a new one
 	req = req.Clone(req.Context())
-
-	secCtx, err := t.initSecContext(req)
-	if err != nil {
-		return nil, err
-	}
 
 	defer func() {
 		if secCtx != nil {
@@ -304,6 +339,10 @@ func (t *GSSAPITransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	// Should we opportunistically set the initial token?
 	useOpportunistic := t.opportunisticFunc != nil && t.opportunisticFunc(*req.URL)
+
+	if useOpportunistic && t.channelBindingDisposition != ChannelBindingDispositionIgnore {
+		return nil, fmt.Errorf("channel binding is not supported when opportunistic authentication is requested")
+	}
 
 	// use Expect: Continue for large requests or if we can't rewind the body, when we're not doing opportunistic authentication
 	if !useOpportunistic && t.expect100Threshold > 0 {
@@ -333,6 +372,8 @@ contextLoop:
 			if err != nil {
 				return nil, err
 			}
+
+			tlsConnState = resp.TLS
 
 			// Check for a negotiate challenge in the response - which can be in a 401 or any other final response
 			challenges := findSchemeChallenges(&resp.Header, "Negotiate")
@@ -364,7 +405,13 @@ contextLoop:
 			}
 		}
 
-		if secCtx.ContinueNeeded() {
+		if (secCtx != nil && secCtx.ContinueNeeded()) || secCtx == nil {
+			if secCtx == nil {
+				secCtx, err = t.initSecContext(req, tlsConnState)
+				if err != nil {
+					return nil, err
+				}
+			}
 			// leaves any token that needs to be send to the server in the request's Authorization header
 			// which will be sent in the next round trip
 			info, err = t.continueSecContext(secCtx, inToken, req)

@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"strings"
 	"testing"
 
@@ -40,7 +39,7 @@ type serverInfo struct {
 // mess up the response if told to do so.
 func newTestServer(t *testing.T, ignoreMutual bool, cantAccept bool, sendBadAuthzHeader bool, serverInfo *serverInfo) *httptest.Server {
 
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authzType, authzToken := parseAuthzHeader(&r.Header)
 		if authzType == "Negotiate" && len(authzToken) > 0 {
 			serverInfo.gotAuthzHeader = true
@@ -103,16 +102,6 @@ func newTestServer(t *testing.T, ignoreMutual bool, cantAccept bool, sendBadAuth
 	}))
 }
 
-func enableLogging() bool {
-	loggingEnv := os.Getenv("GSSAPI_HTTP_LOGGING")
-	enableLogging := false
-	switch strings.ToLower(loggingEnv) {
-	case "yes", "1", "true":
-		enableLogging = true
-	}
-	return enableLogging
-}
-
 // TestClient uses a small rewindble POST body with Expect: Continue disabled.
 // These tests verify how the client handles authentication and authentication failures.
 func TestClient(t *testing.T) {
@@ -121,15 +110,16 @@ func TestClient(t *testing.T) {
 	body := []byte("I love GSSAPI!")
 
 	tests := []struct {
-		name                     string
-		clientMutual             bool // the client should request mutual authentication
-		clientOpportunistic      bool // the client should opportunistically authenticate
-		serverIgnoreMutual       bool // the server should ignore mutual authentication
-		serverBadAuthzHeader     bool // the server should send a bad Authorization header
-		serverCantAccept         bool // the server should not accept the context
-		expectRequestedNegotiate bool // the server should have sent a 401
-		expectSuccess            bool // the client should return an error
-		expectStatus             int  // the final response should have this status code
+		name                      string
+		clientMutual              bool // the client should request mutual authentication
+		clientOpportunistic       bool // the client should opportunistically authenticate
+		serverIgnoreMutual        bool // the server should ignore mutual authentication
+		serverBadAuthzHeader      bool // the server should send a bad Authorization header
+		serverCantAccept          bool // the server should not accept the context
+		expectRequestedNegotiate  bool // the server should have sent a 401
+		expectSuccess             bool // the client should return an error
+		expectStatus              int  // the final response should have this status code
+		channelBindingDisposition ghttp.ChannelBindingDisposition
 	}{
 		{name: "No-Mutual-No-Opportunistic", expectRequestedNegotiate: true, expectSuccess: true, expectStatus: 200},
 		{name: "No-Mutual-Opportunistic", clientOpportunistic: true, expectSuccess: true, expectStatus: 200},
@@ -138,6 +128,8 @@ func TestClient(t *testing.T) {
 		{name: "Mutual-Opportunistic", clientMutual: true, clientOpportunistic: true, expectSuccess: true, expectStatus: 200},
 		{name: "Bad-Mutual-Token", clientMutual: true, clientOpportunistic: true, serverBadAuthzHeader: true, expectSuccess: false},
 		{name: "Server-Ignore-Mutual", clientMutual: true, clientOpportunistic: true, serverIgnoreMutual: true, expectSuccess: false},
+		{name: "Opportunistic-with-CB", clientOpportunistic: true, channelBindingDisposition: ghttp.ChannelBindingDispositionIfAvailable, expectSuccess: false},
+		{name: "No-Opportunistic-with-CB", clientOpportunistic: false, channelBindingDisposition: ghttp.ChannelBindingDispositionIfAvailable, expectSuccess: true, expectStatus: 200},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -149,25 +141,30 @@ func TestClient(t *testing.T) {
 			defer ts.Close()
 
 			opts := []ghttp.ClientOption{
-				ghttp.WithSpnFunc(func(url url.URL) string {
+				ghttp.WithInitiatorSpnFunc(func(url url.URL) string {
 					return "HTTP@foo.golang-auth.io"
 				}),
 			}
 			if enableLogging() {
-				opts = append(opts, ghttp.WithHttpLogging(),
-					ghttp.WithLogFunc(func(format string, args ...interface{}) {
+				opts = append(opts, ghttp.WithInititorHttpLogging(),
+					ghttp.WithInitiatorLogFunc(func(format string, args ...interface{}) {
 						t.Logf(format, args...)
 					}))
 			}
 
 			if tt.clientMutual {
-				opts = append(opts, ghttp.WithMutual())
+				opts = append(opts, ghttp.WithInitiatorMutual())
 			}
 			if tt.clientOpportunistic {
-				opts = append(opts, ghttp.WithOpportunistic())
+				opts = append(opts, ghttp.WithInitiatorOpportunistic())
+			}
+			if tt.channelBindingDisposition != ghttp.ChannelBindingDispositionIgnore {
+				opts = append(opts, ghttp.WithInitiatorChannelBindingDisposition(tt.channelBindingDisposition))
 			}
 
-			client := ghttp.NewClient(ta.lib, nil, opts...)
+			client := ts.Client()
+			client, err := ghttp.NewClient(ta.lib, client, opts...)
+			assert.NoErrorFatal(err)
 			req, err := http.NewRequest("POST", ts.URL, bodyReader)
 			assert.NoErrorFatal(err)
 
@@ -215,14 +212,14 @@ func TestClient100Continue(t *testing.T) {
 		// these tests should trigger the 100-continue header because the body size is larger than the threshold value
 		{"BigBody-Non-Opportunistic-Rewindable", 100, false, true, true, false},
 		{"BigBody-Non-Opportunistic-Non-Rewindable", 100, false, false, true, false},
-		// these tests should not trigger the 100-continue header because the body is smaller than the threshold value or
-		// opportunistic authentication is requested
+		// // these tests should not trigger the 100-continue header because the body is smaller than the threshold value or
+		// // opportunistic authentication is requested
 		{"SmallBody-Opportunistic-Rewindable", 4096, true, true, false, false},
 		{"SmallBody-Opportunistic-Non-Rewindable", 4096, true, false, false, false},
 		{"SmallBody-Non-Opportunistic-Rewindable", 4096, false, true, false, false},
-		// this test will trigger the 100-continue header because it is non-opportunistic and the body is not rewindable, making the request successful
+		// // this test will trigger the 100-continue header because it is non-opportunistic and the body is not rewindable, making the request successful
 		{"SmallBody-Non-Opportunistic-Non-Rewindable", 4096, false, false, true, false},
-		// should fail not trigger 100-continue (disabled) - so will fail because the non-rewindable body will be sent before receiving the 401
+		// // should fail not trigger 100-continue (disabled) - so will fail because the non-rewindable body will be sent before receiving the 401
 		{"SmallBody-Non-Opportunistic-Non-Rewindable-100-disabled", 0, false, false, false, true},
 	}
 
@@ -237,19 +234,19 @@ func TestClient100Continue(t *testing.T) {
 			defer ts.Close()
 
 			opts := []ghttp.ClientOption{
-				ghttp.WithSpnFunc(func(url url.URL) string {
+				ghttp.WithInitiatorSpnFunc(func(url url.URL) string {
 					return "HTTP@foo.golang-auth.io"
 				}),
-				ghttp.WithHttpLogging(),
-				ghttp.WithLogFunc(func(format string, args ...interface{}) {
+				ghttp.WithInititorHttpLogging(),
+				ghttp.WithInitiatorLogFunc(func(format string, args ...interface{}) {
 					if enableLogging {
 						t.Logf(format, args...)
 					}
 				}),
-				ghttp.WithExpect100Threshold(tt.expectContinueThreshold),
+				ghttp.WithInitiatorExpect100Threshold(tt.expectContinueThreshold),
 			}
 			if tt.clientOpportunistic {
-				opts = append(opts, ghttp.WithOpportunistic())
+				opts = append(opts, ghttp.WithInitiatorOpportunistic())
 			}
 
 			req, err := http.NewRequest("POST", ts.URL, bodyReader)
@@ -262,7 +259,8 @@ func TestClient100Continue(t *testing.T) {
 			trace := &ghttp.HttpTrace{}
 			req = req.WithContext(ghttp.WithHttpTrace(req.Context(), trace))
 
-			client := ghttp.NewClient(ta.lib, nil, opts...)
+			client, err := ghttp.NewClient(ta.lib, ts.Client(), opts...)
+			assert.NoErrorFatal(err)
 			resp, err := client.Do(req)
 			if tt.expectError {
 				assert.Equal(0, si.bodyBytes)

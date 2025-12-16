@@ -5,3 +5,18 @@ updates:
     interval: weekly
   target-branch: "staging"
   open-pull-requests-limit: 5
+
+- package-ecosystem: github-actions
+  directory: /
+  schedule:
+    interval: daily
+
+- package-ecosystem: gomod
+  directory: /
+  schedule:
+    interval: daily
+
+- package-ecosystem: gomod
+  directory: /http/test
+  schedule:
+    interval: daily

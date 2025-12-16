@@ -17,11 +17,17 @@ func TestFlagList(t *testing.T) {
 
 func TestFlagName(t *testing.T) {
 	assert.Equal(t, "Delegation", flagName(ContextFlagDeleg))
-	assert.Equal(t, "Integrity", flagName(ContextFlagInteg))
 	assert.Equal(t, "Mutual authentication", flagName(ContextFlagMutual))
-	assert.Equal(t, "Channel Bindings required/present", flagName(ContextFlagChannelBound))
+	assert.Equal(t, "Message replay detection", flagName(ContextFlagReplay))
+	assert.Equal(t, "Out of sequence message detection", flagName(ContextFlagSequence))
+	assert.Equal(t, "Confidentiality", flagName(ContextFlagConf))
+	assert.Equal(t, "Integrity", flagName(ContextFlagInteg))
 	assert.Equal(t, "Anonymous", flagName(ContextFlagAnon))
+	assert.Equal(t, "Channel Bindings required/present", flagName(ContextFlagChannelBound))
+	assert.Equal(t, "DCE style", flagName(ContextFlagDceStyle))
+	assert.Equal(t, "Identify only", flagName(ContextFlagIdentify))
 	assert.Equal(t, "Extended errors", flagName(ContextFlagExtendedError))
+
 }
 
 func TestFlagString(t *testing.T) {

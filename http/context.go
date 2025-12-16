@@ -6,6 +6,8 @@ import (
 	"context"
 	"net"
 	"net/http"
+
+	"github.com/golang-auth/go-gssapi/v3"
 )
 
 type contextKey struct {
@@ -17,6 +19,7 @@ func (k *contextKey) String() string { return "gssapi/http context value " + k.n
 var connContextKey = &contextKey{"conn"}
 var initiatorContextKey = &contextKey{"initiator"}
 var hasCBContextKey = &contextKey{"has-cb"}
+var delegatedCredContextKey = &contextKey{"delegated-cred"}
 
 // Record the net.Conn in the connection's context which is passed to Handlers
 // as part of the http.Request context.
@@ -70,4 +73,19 @@ func getHasCBContext(ctx context.Context) bool {
 	}
 
 	return hasCB
+}
+
+// stashDelegatedCredential stores the delegated credential in the request context
+func stashDelegatedCredential(ctx context.Context, cred gssapi.Credential) context.Context {
+	ctx = context.WithValue(ctx, delegatedCredContextKey, cred)
+	return ctx
+}
+
+// getDelegatedCredentialContext returns the delegated credential from a context
+func getDelegatedCredentialContext(ctx context.Context) gssapi.Credential {
+	cred, ok := ctx.Value(delegatedCredContextKey).(gssapi.Credential)
+	if !ok {
+		return nil
+	}
+	return cred
 }

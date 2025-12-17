@@ -139,7 +139,7 @@ and negotiated.
 
 ## HTTP Negotiate
 
-A GSSAPI enabled [http-client] is provided in [v3/http][gssapi-http].
+A GSSAPI enabled [http-client] is provided in [http][gssapi-http].
 
 ## Example code
 
@@ -147,7 +147,7 @@ Examples in Go are available along with C and Java examples collected from the I
 are available [in the gssapi-examples repo](https://github.com/golang-auth/gssapi-examples).
 
 [http-client]: https://pkg.go.dev/net/http#Client
-[gssapi-http]: v3/http
+[gssapi-http]: ./http
 [gssapi-c]: https://github.com/golang-auth/go-gssapi-c
 [go-gssapi-spec]: https://github.com/golang-auth/go-gssapi/wiki/Golang-GSSAPI-bindings-specification
 [rfc7546]: https://datatracker.ietf.org/doc/html/rfc7546

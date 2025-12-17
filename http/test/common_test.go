@@ -262,3 +262,13 @@ func writeKrb5Confs() (f1 string, err error) {
 
 	return
 }
+
+func enableLogging() bool {
+	loggingEnv := os.Getenv("GSSAPI_HTTP_LOGGING")
+	enableLogging := false
+	switch strings.ToLower(loggingEnv) {
+	case "yes", "1", "true":
+		enableLogging = true
+	}
+	return enableLogging
+}

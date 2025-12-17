@@ -9,3 +9,4 @@ linters:
         # https://staticcheck.dev/docs/checks/#QF1001
         - -QF1001
         - -ST1003
+        - -SA1019

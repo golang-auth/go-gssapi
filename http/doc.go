@@ -42,7 +42,7 @@ To control GSSAPI parameters, create a transport:
 
 The GSSAPI enabled transport wraps a standard [http.RoundTripper]. By default
 it uses [http.DefaultTransport]. A custom round-tripper can be provided to the
-transport using [WithRoundTripper].
+transport using [WithInitiatorRoundTripper].
 
 # Request body handling
 
@@ -144,5 +144,74 @@ Use Negotiate authentication for all paths:
 
 	h := ghttp.NewHandler(p, http.DefaultServeMux)
 	log.Fatal(http.ListenAndServe(":8080", h))
+
+# Channel binding
+
+Channel binding ties authentication events to the underlying communication channel.
+Its purpose is to detect man-in-the-middle attacks by cryptographically comparing
+an aspect of the channel known to both the initator and the acceptor that would be
+modified by the presence of an unauthorized intermediate.
+
+This library supports TLS endpoint channel binding, which the Kerberos mechanism
+conveys as part of the AP_REQ authenticator checksum. TLS endpoint channel binding
+uses a hash of the TLS server certificate as the channel binding data. A man-in-the-middle attacker
+is presumed to not have access to the private key of the server, so even if the
+attacker were able to obtain a certificate for the service that is trusted by the client (for example,
+from a corporate TLS intercepting proxy or a rogue CA), the hash of the certificate
+presented to the client by the attacker will not match that of the genuine server
+certificate.
+
+Configuration:
+
+Channel binding can be configured separately for the initiator (client) and
+acceptor (server). Both must use TLS-protected endpoints.
+
+The initiator decides whether to use channel bindings by setting its channel
+binding disposition to [ChannelBindingDispositionRequire] or
+[ChannelBindingDispositionIfAvailable]. The acceptor can independently decide
+whether to support channel binding by setting its channel binding disposition
+to [ChannelBindingDispositionRequire] or [ChannelBindingDispositionIfAvailable].
+
+Standard behavior (RFC 2743):
+
+Under standard RFC 2743 behavior (without Channel Bound extensions), channel
+binding only detects mismatches: if both sides specify channel bindings that do
+not match, the security context establishment fails. If both ends supply matching
+channel bindings, or only one end supplies them, the context is established
+successfully and neither end can distinguish between these cases. This is the
+behavior observed when [ChannelBindingDispositionIfAvailable] is used.
+
+Channel bound extension:
+
+If the Channel Bound GSSAPI extension is available, the initiator may use
+[ChannelBindingDispositionRequire] to signal to the acceptor that it requires
+channel bindings. This sets a Microsoft Kerberos extension flag in the
+authenticator, causing the acceptor to require channel bindings from the
+initiator. If [ChannelBindingDispositionRequire] is configured on the acceptor,
+the security context establishment will fail if the initiator does not supply
+matching channel bindings.
+
+Note: Using [ChannelBindingDispositionRequire] requires that the GSSAPI provider
+supports the Channel Bound GSSAPI extension.
+
+Caveats:
+
+There are some caveats to using channel bindings:
+
+  - Opportunistic authentication with channel bindings is not supported because
+    the server certificate is only available to the client after one round-trip
+    to the server. The request will fail if [OpportunisticFunc] returns true and
+    channel bindings are configured on the client.
+
+  - For services backed by a cluster of servers, each server must use exactly the
+    same certificate because the client uses the certificate from the first round-trip
+    to form the channel binding data - and in any case, HTTP is stateless and there is
+    no guarantee that subsequent requests will hit the same server.
+    This makes it difficult to update the certificate across the cluster
+    without causing authentication failures during the switch.
+
+  - If a load balancer or reverse proxy terminates TLS, it must also use the same
+    certificate as the backend servers. This compounds the problem of updating
+    the certificate across the cluster.
 */
 package http

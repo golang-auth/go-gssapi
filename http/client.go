@@ -170,7 +170,7 @@ func WithInitiatorChannelBindingDisposition(disposition ChannelBindingDispositio
 // overridden by passing a custom round tripper with [WithRoundTripper].
 func NewTransport(provider gssapi.Provider, options ...ClientOption) (*GSSAPITransport, error) {
 	t := &GSSAPITransport{
-		transport:        http.DefaultTransport,
+		transport:        http.DefaultTransport, // may be overridden by options
 		provider:         provider,
 		spnFunc:          DefaultSpnFunc,
 		delegationPolicy: DefaultDelegationPolicy,
@@ -189,11 +189,19 @@ func NewTransport(provider gssapi.Provider, options ...ClientOption) (*GSSAPITra
 		return nil, errors.New("channel bound GGSSAPI signalling extension unavailable: cannot require channel bindings")
 	}
 
+	// If the transport is an http.Transport then clone it and modify it to disable HTTP/2
+	// and make sure the expect timeout is sensible
 	if transport, ok := t.transport.(*http.Transport); ok {
 		transport = transport.Clone()
 
-		// Can't use GSSAPI with HTTP/2
+		// Disable HTTP/2
 		transport.ForceAttemptHTTP2 = false
+		transport.TLSNextProto = nil
+
+		if transport.TLSClientConfig == nil {
+			transport.TLSClientConfig = &tls.Config{}
+		}
+		transport.TLSClientConfig.NextProtos = []string{"http/1.1"}
 
 		// zero causes continue requests to fail
 		if transport.ExpectContinueTimeout == 0 {
@@ -220,8 +228,10 @@ func NewClient(provider gssapi.Provider, client *http.Client, options ...ClientO
 		client = http.DefaultClient
 	}
 
+	// If the source client has a specific round-tripper then use that in the GSSAPI transport
+	// If options also includes a round-tripper, that will take precedence.
 	if client.Transport != nil {
-		options = append(options, WithInitiatorRoundTripper(client.Transport))
+		options = append([]ClientOption{WithInitiatorRoundTripper(client.Transport)}, options...)
 	}
 
 	// Copy the client to avoid modifying the original

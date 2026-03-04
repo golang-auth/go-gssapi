@@ -18,7 +18,7 @@ import (
 type SpnFunc func(url url.URL) string
 
 func defaultSpnFunc(url url.URL) string {
-	return "HTTP@" + url.Host
+	return "HTTP@" + url.Hostname()
 }
 
 // DefaultSpnFunc is the default SPN function used for new clients.
@@ -117,7 +117,14 @@ func WithInitiatorSpnFunc(spnFunc SpnFunc) ClientOption {
 }
 
 // WithIniiatorDelegationPolicy configures the client to use a custom credential delegation policy.
+// Deprecated: Use WithInitiatorDelegationPolicy instead.
+// This typo'd function remains here for API compatibility
 func WithIniiatorDelegationPolicy(delegationPolicy DelegationPolicy) ClientOption {
+	return WithInitiatorDelegationPolicy(delegationPolicy)
+}
+
+// WithInitiatorDelegationPolicy configures the client to use a custom credential delegation policy.
+func WithInitiatorDelegationPolicy(delegationPolicy DelegationPolicy) ClientOption {
 	return func(c *GSSAPITransport) {
 		c.delegationPolicy = delegationPolicy
 	}

@@ -68,7 +68,7 @@ func TestInitiatorWithDelegationPolicy(t *testing.T) {
 	assert := test.NewAssert(t)
 	transport, err := NewTransport(nil)
 	assert.NoErrorFatal(err)
-	opt := WithIniiatorDelegationPolicy(DelegationPolicyAlways)
+	opt := WithInitiatorDelegationPolicy(DelegationPolicyAlways)
 	opt(transport)
 	assert.Equal(DelegationPolicyAlways, transport.delegationPolicy)
 }

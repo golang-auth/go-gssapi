@@ -1,0 +1,88 @@
+name: Go/OS compatibility
+
+# Scheduled compatibility run: tests against the currently supported Go
+# releases (stable and oldstable, resolved from go.dev at run time so the
+# matrix never goes stale) on the platforms covered by the main CI, plus a
+# cross-compile for the BSDs that go-gssapi-c supports.
+
+on:
+  schedule:
+    - cron: "37 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Test exactly the toolchain we installed; never auto-download a newer one.
+  GOTOOLCHAIN: local
+
+jobs:
+  go-versions:
+    name: Resolve supported Go releases
+    runs-on: ubuntu-latest
+    outputs:
+      stable: ${{ steps.resolve.outputs.stable }}
+      oldstable: ${{ steps.resolve.outputs.oldstable }}
+    steps:
+      - name: Look up stable and oldstable on go.dev
+        id: resolve
+        run: |
+          # go.dev lists the latest patch of each supported major release, newest first
+          json=$(curl -fsSL 'https://go.dev/dl/?mode=json')
+          stable=$(jq -r '[.[] | select(.stable)][0].version | ltrimstr("go")' <<<"$json")
+          oldstable=$(jq -r '[.[] | select(.stable)][1].version | ltrimstr("go")' <<<"$json")
+          test -n "$stable" -a -n "$oldstable"
+          echo "stable=$stable" >> "$GITHUB_OUTPUT"
+          echo "oldstable=$oldstable" >> "$GITHUB_OUTPUT"
+          echo "Go releases under test: stable=$stable oldstable=$oldstable" | tee -a "$GITHUB_STEP_SUMMARY"
+
+  tests:
+    name: ${{ matrix.os }} / Go ${{ matrix.go }}
+    needs: go-versions
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        go: [stable, oldstable]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Set up Go ${{ needs.go-versions.outputs[matrix.go] }}
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version: ${{ needs.go-versions.outputs[matrix.go] }}
+
+      - name: OS and Go details
+        run: |
+          uname -a
+          if [ -e /etc/os-release ]; then cat /etc/os-release; fi
+          go version
+
+      - name: Install Ubuntu packages
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          sudo apt-get install -y krb5-user libkrb5-dev pkg-config
+
+      - name: Run tests
+        run: |
+          go test $(go list ./... | egrep -v '/examples/|/build-tools/') -count 1
+          cd http/test
+          go test -count 1
+
+      - name: Cross-compile for the BSDs
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          for os in freebsd openbsd; do
+            echo "==> GOOS=$os"
+            GOOS=$os GOARCH=amd64 go build ./...
+            GOOS=$os GOARCH=amd64 go test -c -o /dev/null .
+          done

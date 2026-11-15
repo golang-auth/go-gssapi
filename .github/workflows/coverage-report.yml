@@ -54,7 +54,13 @@ jobs:
           pushd http/test
           go test -coverpkg ../ -coverprofile=cover.out -covermode=atomic
           popd
-          go run github.com/wadey/gocovmerge@latest ./cover.out ./http/test/cover.out > cover-all.out
+          # gocovmerge has no go.mod, so @latest resolves the newest golang.org/x/tools,
+          # which can need a newer Go than the one under test. Build it with a pinned x/tools.
+          gcm=$(mktemp -d)
+          (cd "$gcm" && go mod init gcm >/dev/null 2>&1 &&
+            go get github.com/wadey/gocovmerge@b5bfa59ec0ad golang.org/x/tools@v0.30.0 &&
+            go build -o gocovmerge github.com/wadey/gocovmerge)
+          "$gcm/gocovmerge" ./cover.out ./http/test/cover.out > cover-all.out
 
       - name: Generate report
         run: |
